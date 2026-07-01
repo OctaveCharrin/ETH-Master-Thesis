@@ -1,0 +1,106 @@
+\chapter{Problem Statement}
+\label{ch:problem}
+
+This chapter states the problem the thesis addresses, the properties a good solution must exhibit,
+the assumptions under which we operate, and the trust model that replaces the classical attacker
+model for this performance-oriented work.
+
+\section{Problem Formulation}
+\label{sec:problem:formulation}
+
+Consider an end host that must carry an application's traffic toward a destination over a path-aware
+network. At any moment the host has access to a set of candidate paths $\mathcal{P} =
+\{p_1, \dots, p_N\}$, each described by measurable (and partly stale) properties -- latency, available
+bandwidth, loss, hop count, a trust score -- and the application expresses an \emph{intent} $g$: a
+statement of what it values, such as ``maximize goodput'' or ``minimize latency and jitter.'' The
+network's state evolves over time as cross-traffic, congestion, and topology change. The host must
+repeatedly decide how to serve the application:
+
+\begin{itemize}
+  \item In \textbf{Part~I}, the decision is a \emph{single path} $p^\star \in \mathcal{P}$ to carry the
+  flow, chosen to maximize the application's intent-weighted objective while spending as little probing
+  effort as possible.
+  \item In \textbf{Part~II}, the decision is richer: a \emph{split} $(w_1, \dots, w_N)$ of the flow's
+  traffic across the paths \emph{and} the application's own \emph{sending rate} (video bitrate), chosen
+  jointly to maximize real-time video QoE.
+\end{itemize}
+
+In both cases the underlying question is the one posed in \cref{ch:introduction}: \emph{choose the best
+use of the available paths given the application's intent and the network's state}. The technical crux
+is that neither the objective nor the action set is fixed -- the objective is dictated by an
+intent that can change from flow to flow, and the action set is a path collection that changes across
+pairs and over time.
+
+\section{Desired Properties}
+\label{sec:problem:properties}
+
+A satisfactory solution should have the following properties, which also define the quality metrics
+used in the evaluation (\cref{ch:p1eval,ch:p2eval,ch:analysis}).
+
+\begin{description}
+  \item[Intent alignment.] The chosen action should maximize the objective the application actually
+  cares about. Concretely, a policy conditioned on intent $g$ should make decisions that score well
+  under $g$ -- and \emph{measurably differently} for different $g$. A policy that ignores its intent
+  input has failed this property even if its average reward looks reasonable.
+  \item[No per-objective retraining.] A single trained policy should serve the whole spectrum of
+  intents, including intents not seen at training time, rather than requiring a separately trained
+  model for each objective. This is what makes the approach deployable at Internet scale.
+  \item[Dynamic-action handling.] The policy must accept a variable and changing number of candidate
+  paths without retraining or architectural change, and remain invariant to the arbitrary ordering of
+  those paths.
+  \item[Low overhead.] Decisions should be cheap. In Part~I this means minimizing active probing of
+  paths (a first-class term in the reward); in both parts it means bounded per-decision inference cost
+  compatible with the control loop's timescale.
+  \item[Generalization.] Performance should hold across topologies, traffic conditions, and path counts
+  not seen during training, degrading gracefully rather than catastrophically off-distribution.
+  \item[Robustness to volatility.] Under non-stationary conditions -- congestion bursts, path churn,
+  regime shifts -- the policy should retain its advantage over static heuristics, which is precisely
+  where learned control is expected to pay off.
+\end{description}
+
+\section{Assumptions}
+\label{sec:problem:assumptions}
+
+We make the following assumptions explicit.
+
+\begin{enumerate}
+  \item \textbf{Path-aware substrate.} The host can enumerate multiple end-to-end paths to a
+  destination and direct traffic onto a chosen path or split, as SCION provides. We do not assume
+  control over intra-AS routing.
+  \item \textbf{Observable per-path metrics.} Per-path latency, loss, and a bandwidth estimate are
+  measurable, at a probing cost that the agent must economize (Part~I) or are available from transport
+  feedback such as acknowledgements and RTT samples (Part~II).
+  \item \textbf{Intent as a QoS preference.} Application intent is expressed as a compact vector -- a
+  set of reward weights over throughput, latency, jitter, loss, and trust (Part~I), or the fixed QoE
+  weighting of a real-time video call (Part~II). We do not attempt to \emph{infer} latent intent from
+  traffic; we assume the application (or a shim on its behalf) can declare it.
+  \item \textbf{Stationarity within a decision epoch.} Network conditions are assumed roughly stable
+  over the short interval of a single decision, though they may drift or shift abruptly between epochs;
+  the non-stationary regimes we study (\cref{ch:p2eval}) stress exactly this assumption.
+\end{enumerate}
+
+\section{Deployment and Trust Assumptions}
+\label{sec:problem:trust}
+
+This thesis is a performance and control study, not a security study, so in place of a classical
+attacker model we state the trust assumptions under which the learned controllers operate and note
+where security considerations would enter a real deployment.
+
+\begin{itemize}
+  \item \textbf{Honest measurements.} We assume that the per-path measurements an agent acts on --
+  whether obtained by active probing (Part~I) or transport feedback (Part~II) -- are honest. A
+  malicious on-path element that fabricates favorable metrics could steer an agent toward a bad path;
+  defending against this is out of scope, though the trust term below offers partial mitigation.
+  \item \textbf{SCION path authenticity and trust.} SCION's cryptographically authenticated paths mean
+  an agent knows \emph{which} ASes a path traverses and cannot be silently redirected. Part~I's reward
+  includes a \emph{trust} component derived from path quality, letting the agent prefer
+  higher-confidence paths and discount those with anomalous loss or latency -- a lightweight hedge
+  against unreliable or adversarial path advertisement rather than a full defense.
+  \item \textbf{No adversarial control of the learner.} We assume the agent's own training and
+  inference pipeline is trusted; adversarial manipulation of the RL policy (e.g.\ reward poisoning or
+  observation attacks) is beyond this work.
+\end{itemize}
+
+A production deployment would need to revisit these assumptions -- in particular, verifying measurement
+integrity and bounding the damage a single misreported path can do. We return to the deployability
+question in \cref{ch:analysis,ch:discussion}.

@@ -1,0 +1,124 @@
+\chapter{Introduction}
+\label{ch:introduction}
+
+The Internet was designed to deliver packets, not experiences. A router forwards a datagram
+toward its destination without any notion of \emph{why} the datagram was sent: whether it
+carries a frame of an interactive video call that will be worthless if it arrives late, a
+byte of a background software update that only cares about aggregate throughput, or a
+control message whose loss would be catastrophic. For decades this deliberate ignorance --
+the end-to-end principle -- was a feature. Yet as applications have become more diverse and
+more demanding, the mismatch between what the network optimizes and what the application
+actually values has grown into one of the central inefficiencies of modern networking.
+
+Path-aware Internet architectures such as SCION~\cite{Perrig2017} change the terms of this
+problem. In SCION, endpoints discover \emph{multiple} end-to-end paths to a destination and
+choose among them, rather than deferring blindly to whatever route BGP happens to install.
+This turns path selection from a network-internal decision into an application-facing one:
+for the first time the entity that knows the application's intent -- the endpoint -- also
+holds the lever that determines how traffic is carried. The question this thesis studies is
+the natural consequence of that shift:
+
+\begin{quote}
+\itshape How should an endpoint choose the best path -- or the best \emph{combination} of
+paths -- given both the intention of the application and the current state of the network?
+\end{quote}
+
+Answering this question is hard for three compounding reasons. First, \emph{``best'' is not
+a fixed target}. A path that is best for a bulk transfer (high goodput, tolerant of latency)
+is often a poor choice for a video call (which prizes low latency and jitter and will trade
+raw throughput to get them). Any single hand-tuned objective is therefore wrong for some
+application, and training a separate policy for every conceivable objective does not scale.
+Second, \emph{the decision space is dynamic and unbounded}. The set of available paths between
+two hosts differs from pair to pair and changes over time as links appear, fail, congest, or
+recover; a policy that assumes a fixed, enumerated action set cannot cope. Third, \emph{the
+state is only partially and expensively observable}. Fresh per-path measurements cost probing
+overhead, so a good policy must decide well while measuring little.
+
+This thesis attacks the question in two movements, unified by a single idea borrowed from
+recent work on congestion control. The Mortise system~\cite{Shen2026} shows that a transport
+mechanism can be steered to maximize an application's quality of experience (QoE) by treating
+the application's \emph{intent} as an explicit input that reshapes how the mechanism is tuned,
+rather than as a fixed constant baked into the algorithm. We take the same stance and push it
+into two new settings.
+
+\paragraph{Part~I: steering \emph{which} path.} We build on the DQN-based SCION path selector
+of Bourak~et~al.~\cite{Bourak2025} and rework it into an intent-conditioned path-selection
+agent. We improve the underlying SCION simulation environment, replace the fixed-action DQN
+with a permutation-equivariant \emph{path-scoring} architecture that handles a variable number
+of candidate paths, and -- the key contribution -- condition the agent on a compact
+representation of application intent using \emph{feature-wise linear modulation}
+(FiLM)~\cite{Perez2018}. A single trained policy can then serve a throughput-hungry transfer,
+a latency-sensitive call, or any point in between, simply by changing the intent vector at
+inference time, without retraining. This is the path-selection analogue of Mortise's
+intent-driven parameter tuning.
+
+\paragraph{Part~II: steering \emph{how much} of each path, and \emph{what} the application
+sends.} Part~I chooses a single path. But SCION's multipath nature invites a more ambitious
+question: what if we use several paths at once, and co-optimize the application itself? Where
+Mortise tunes the congestion-control algorithm to the application, we tune both the
+\emph{application} (the video encoder's target bitrate) and the \emph{network} (the split of
+traffic across paths) jointly. Using a Multipath-QUIC~\cite{DeConinck2017} transport carrying
+a real-time WebRTC-style video flow, we design a hierarchical pair of reinforcement-learning
+agents -- a slow application agent that adapts bitrate and a fast transport agent that
+schedules bytes across paths -- coupled so that each accounts for the other. This closes the
+loop from intent all the way to what the application chooses to produce. Because Part~II's
+Multipath~QUIC transport rides on top of the same path-aware substrate, it is best read as
+\emph{multipath transport enabled by SCION's native path multiplicity}: SCION supplies the
+several disjoint paths, and the agents decide how to use them.
+
+Throughout, a set of questions guides the reader. \emph{Can one policy serve many intents
+without retraining, and does conditioning actually change its decisions or merely its
+rhetoric?} \emph{When is it worth splitting traffic across paths at all, and when does a
+single good path suffice?} \emph{Does co-optimizing the application with the network beat
+optimizing either alone?} \emph{And how far is any of this from something one could deploy?}
+We will see that the answers are often not the obvious ones -- for instance, that multipath
+scheduling can be nearly worthless in a stable network yet decisive in a volatile one.
+
+\section{Contributions}
+\label{sec:intro:contributions}
+
+This thesis makes the following contributions.
+
+\begin{enumerate}
+  \item \textbf{An intent-conditioned path-selection agent for SCION.} We extend the DQN path
+  selector of Bourak~et~al.~\cite{Bourak2025} with (i) an improved, higher-fidelity SCION
+  simulation environment driven by realistic beaconing and multi-day traffic, (ii) a
+  permutation-equivariant path-scoring network that supports a variable and changing set of
+  candidate paths, and (iii) a FiLM-based conditioning mechanism that lets one policy realize a
+  spectrum of application intents without retraining (\cref{ch:p1design,ch:p1impl}).
+
+  \item \textbf{Evidence that intent conditioning must modulate, not merely append.} We show
+  analytically and empirically why naively concatenating an intent vector to the state fails to
+  change a greedy selector's decisions, and why feature-wise modulation is the appropriate
+  mechanism (\cref{ch:p1design}).
+
+  \item \textbf{A hierarchical agent pair for joint application--network optimization over
+  multipath.} We design and implement a two-timescale reinforcement-learning system that
+  co-optimizes video bitrate (application) and per-path traffic split (network) over
+  Multipath~QUIC, realized on both a packet-level NS-3 backend and a fast analytical backend
+  behind a common interface (\cref{ch:p2design,ch:p2impl}).
+
+  \item \textbf{An evaluation and analysis of \emph{when} each mechanism pays off.} We
+  characterize the conditions under which intent conditioning and multipath scheduling deliver
+  value -- and the conditions under which simpler baselines suffice -- and we assess the
+  overhead, scalability, generalization, and deployability of both systems
+  (\cref{ch:analysis,ch:discussion}).
+\end{enumerate}
+
+\section{Organization}
+\label{sec:intro:organization}
+
+\Cref{ch:background} reviews the background this thesis builds on: the SCION architecture, the
+reinforcement-learning machinery (DQN and its refinements, soft actor-critic, variable
+action spaces, and FiLM-based conditioning), and the QoE and multipath-transport concepts used
+in Part~II. \Cref{ch:problem} states the problem precisely, lists the properties a good
+solution must have, and makes explicit the assumptions and trust model.
+
+The body is then organized in three parts. \textbf{Part~I} covers intent-aware single-path
+selection in SCION: its design (\cref{ch:p1design}), implementation (\cref{ch:p1impl}), and
+evaluation (\cref{ch:p1eval}). \textbf{Part~II} covers joint application--network optimization
+over multipath: design (\cref{ch:p2design}), implementation (\cref{ch:p2impl}), and evaluation
+(\cref{ch:p2eval}). \textbf{Part~III} draws the two together: \cref{ch:analysis} analyzes
+overhead, scalability, generalization, and deployability; \cref{ch:discussion} discusses what
+the results mean; \cref{ch:related} places the work in the research landscape; and
+\cref{ch:conclusion} concludes.

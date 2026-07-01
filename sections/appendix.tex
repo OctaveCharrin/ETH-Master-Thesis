@@ -1,0 +1,54 @@
+\chapter{Reproducibility Details}
+\label{app:reproducibility}
+
+This appendix collects the hyperparameters, reward-profile definitions, and supplementary results that
+support the main text. Values still to be finalized from the experiment runs are marked.
+
+\section{Part~I: Reward Profiles}
+\label{app:p1profiles}
+
+The conditional path-selection agent is trained and evaluated across the reward-weight vectors
+$\mathbf{w} = (w_1, w_2, w_3, w_4, w_{\text{probe}})$ of \cref{eq:p1reward}, spanning distinct application
+intents. \Cref{tab:app:profiles} lists representative profiles.
+
+\begin{table}[h]
+  \centering
+  \caption{Representative reward profiles (application intents) used in Part~I. $w_1$ weights goodput,
+  $w_2$ trust, $w_3$ loss and $w_4$ delay within the trust term, and $w_{\text{probe}}$ the probing
+  penalty.}
+  \label{tab:app:profiles}
+  \begin{tabular}{lccccc}
+    \toprule
+    Profile & $w_1$ & $w_2$ & $w_3$ & $w_4$ & $w_{\text{probe}}$ \\
+    \midrule
+    Balanced        & 0.70 & 0.30 & 0.50 & 0.50 & 0.05 \\
+    Throughput      & 0.95 & 0.05 & 0.35 & 0.35 & 0.05 \\
+    Trust / quality & 0.15 & 0.85 & 0.85 & 0.85 & 0.05 \\
+    Latency         & 0.45 & 0.55 & 0.25 & 0.95 & 0.05 \\
+    Low probe cost  & 0.70 & 0.30 & 0.50 & 0.50 & 0.005 \\
+    High probe cost & 0.70 & 0.30 & 0.50 & 0.50 & 0.25 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Part~I: Agent Hyperparameters}
+\label{app:p1hyper}
+\gap{tabulate the final hyperparameters (hidden sizes, learning rate, discount $\gamma$, target-update
+rate, batch size, replay capacity, PER $\alpha$/$\beta$ schedule, number of training episodes) for the
+flat, scoring, and conditional agents.}
+
+\section{Part~II: QoE Weights and SAC Hyperparameters}
+\label{app:p2hyper}
+
+The QoE reward of \cref{eq:p2qoe} uses default weights $(a,b,c,d) = (1, 0.5, 0.5, 1)$ with latency and
+jitter normalizers of \SI{200}{\milli\second} and \SI{50}{\milli\second}; the application agent acts every
+\SI{1}{\second} and the transport agent every frame (${\approx}\SI{33}{\milli\second}$ at 30\,fps) over
+a bitrate range of \SIrange{300}{6000}{\kilo\bit\per\second}.
+\gap{tabulate the SAC hyperparameters (network sizes, learning rates, discount, target entropy,
+temperature schedule, replay capacity, batch size) and the exact topology parameters (per-path capacity,
+RTT, cross-traffic intensity) for the static four-path and dynamic six-path scenarios.}
+
+\section{Supplementary Results}
+\label{app:extra}
+\gap{additional plots: per-episode training curves, per-intent path-choice distributions (Part~I), and
+representative within-episode split traces (Part~II).}

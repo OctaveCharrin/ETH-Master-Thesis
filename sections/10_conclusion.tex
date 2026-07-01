@@ -1,0 +1,36 @@
+\chapter{Conclusion}
+\label{ch:conclusion}
+
+This thesis asked how an endpoint on a path-aware Internet should choose the best use of its paths given
+the intention of the application and the state of the network. It answered in two movements that share one
+idea, drawn from Mortise~\cite{Shen2026}: treat application intent as a first-class input that reshapes a
+network mechanism, not as a constant compiled into it.
+
+Part~I turned a fixed-objective DQN path selector for SCION~\cite{Bourak2025} into an intent-conditioned
+one. Two design decisions carried the work: a permutation-equivariant \emph{scoring} architecture that
+handles a variable, changing set of candidate paths, and a \emph{feature-wise modulation} of path features
+by the intent vector that lets a single policy serve the whole spectrum of objectives without retraining.
+Part~II asked what happens if we use several paths at once and optimize the application itself, and built a
+two-timescale hierarchical agent pair that co-optimizes video bitrate and per-path traffic split over
+Multipath QUIC, coupled so that each agent accounts for the other.
+
+\paragraph{What we learned.} The most useful findings were the ones that cut against intuition. First, that
+\emph{how} intent is injected matters more than \emph{that} it is injected: for a comparison-based selector,
+appending the intent to the state leaves decisions unchanged, because a symmetric signal cancels under the
+argmax; only modulation reorders the alternatives. Second, that the value of learned multipath scheduling is
+\emph{not} a fixed quantity but a function of network volatility -- negligible when paths are stable, where a
+good bitrate controller over a trivial split suffices, yet decisive under churn and bursts, where the same
+app-only configuration collapses. Both findings sharpen when, and when not, to reach for the more
+sophisticated mechanism.
+
+\paragraph{Future work.} Several threads remain open, and much of the draft's structure is deliberately laid
+out to guide them. On the experimental side: completing the Part~I baseline, intent-alignment, and ablation
+tables; adding seed-level statistics and the flat-versus-scoring comparison in Part~II; and porting the
+non-stationary dynamics into the NS-3 backend so packet-level results can confirm the mock findings. On the
+system side: replacing the TCP-like subflows with a real Multipath QUIC transport, and enriching the VMAF
+surrogate so quality responds to delivery conditions, not just bitrate. On the research side, three
+directions stand out: \emph{inferring} intent from traffic rather than assuming it is declared; \emph{online
+and safe} learning against live traffic with bounded worst-case behavior; and pushing the ``one principle,
+every controllable decision'' recipe further -- for instance, conditioning the Part~II agents on an explicit
+intent vector as Part~I does, unifying the two systems into a single intent-conditioned, cross-layer
+controller for path-aware networks.

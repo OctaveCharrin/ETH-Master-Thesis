@@ -1,0 +1,96 @@
+\chapter{Evaluation: Intent-Aware Path Selection}
+\label{ch:p1eval}
+
+This chapter evaluates the Part~I selectors. It states the experimental setup and metrics
+(\cref{sec:p1eval:setup}), then reports results against the six baselines
+(\cref{sec:p1eval:baselines}), the intent-alignment behavior of the conditional agent
+(\cref{sec:p1eval:intent}), the probing-overhead reduction (\cref{sec:p1eval:overhead}), and an ablation
+ladder isolating each design element (\cref{sec:p1eval:ablation}). Several results tables depend on
+experiment runs that are still in progress; those are marked and left as structured placeholders so that
+the remaining experimental work is well defined.
+
+\section{Experimental Setup}
+\label{sec:p1eval:setup}
+
+\paragraph{Environments.} Experiments use BRITE-generated SCION topologies of varying size, each driven
+by the 28-day hourly traffic model with per-link aggregation (\cref{sec:p1design:env}). Training and
+evaluation are separated by holding out a disjoint set of source--destination pairs and hours, so that
+reported numbers reflect generalization rather than memorization.
+\gap{state the exact topology sizes, number of ASes/links, number of pairs, and train/test split
+actually used, once the full pipeline run completes.}
+
+\paragraph{Intents.} The conditional agent is trained across the reward profiles of
+\cref{sec:p1design:film} (balanced, throughput, trust/loss-averse, latency, probe-frugal) and evaluated on
+those profiles plus held-out interpolated intents to test generalization across the intent space.
+
+\paragraph{Metrics.} For each method we report: the intent-weighted reward of \cref{eq:p1reward}; the
+achieved per-flow latency and bandwidth; the probing overhead (in normalized probe cost); and the
+per-decision selection time. Intent alignment is assessed both by reward under each intent and by
+\emph{behavioral divergence} -- how much the chosen paths change as the intent changes.
+
+\section{Comparison Against Baselines}
+\label{sec:p1eval:baselines}
+
+We compare the conditional path-scoring agent against the six heuristics of
+\cref{sec:p1impl:baselines}, per intent. The expectation, following~\cite{Bourak2025}, is that the
+learned selector matches or beats the \emph{best heuristic for each intent} while using far less probing,
+and -- unlike any single heuristic -- does so for \emph{all} intents with one model.
+
+\placeholderfig{Table: mean intent-weighted reward (and achieved latency/bandwidth) for the conditional
+agent vs.\ shortest-path, widest-path, lowest-latency, ECMP, SCION-default, and random, one column block
+per reward profile.}
+\gap{populate the baseline comparison table from the stage-05 evaluation results; highlight, for each
+intent, which heuristic is strongest and whether the learned agent matches or exceeds it.}
+
+\section{Intent Alignment}
+\label{sec:p1eval:intent}
+
+The defining test of the design is whether one conditioned policy actually \emph{changes its decisions}
+with intent. We evaluate the same trained conditional agent under each intent on a fixed set of
+pairs/hours and measure (i) reward under the matching intent versus reward under a mismatched intent, and
+(ii) how the distribution of chosen paths shifts -- e.g.\ toward low-latency paths under a latency intent,
+toward high-bandwidth paths under a throughput intent.
+
+\placeholderfig{Figure: for a fixed set of decision situations, the chosen-path metric distributions
+(latency, bandwidth, trust) under each intent, showing the policy re-ranking paths as intent changes.}
+\gap{report the intent$\times$intent reward matrix (diagonal should dominate) and the behavioral-shift
+statistics that confirm the FiLM head steers decisions.}
+
+\section{Probing Overhead}
+\label{sec:p1eval:overhead}
+
+Using the probing accounting of \cref{sec:p1impl:baselines}, we compare the learned selector's probing
+footprint against exhaustive-probing heuristics at matched selection quality, reproducing and testing the
+near-oracle-quality-at-reduced-probing result of~\cite{Bourak2025}.
+
+\placeholderfig{Figure: selection quality vs.\ probing cost, learned selector vs.\ exhaustive baselines
+and an oracle.}
+\gap{report the probing-cost reduction at matched reward, and the quality gap to the oracle.}
+
+\section{Ablation Study}
+\label{sec:p1eval:ablation}
+
+We isolate the contribution of each design element by walking up the agent ladder of
+\cref{sec:p1impl:agents}:
+
+\begin{enumerate}
+  \item \textbf{Flat vs.\ scoring.} Does the permutation-equivariant scoring architecture improve over a
+  fixed-action DQN, and does it generalize across path counts that a flat agent cannot even represent?
+  \item \textbf{Scoring vs.\ conditional.} Does adding intent conditioning let one model match a suite of
+  per-intent-trained scoring models, avoiding per-objective retraining?
+  \item \textbf{FiLM vs.\ concatenation.} The critical ablation: replace the FiLM head with plain
+  concatenation of the intent vector and confirm the failure predicted in \cref{sec:p1design:concat} --
+  that behavior becomes (near-)invariant to intent even though reward on the training intent may look
+  acceptable.
+\end{enumerate}
+
+\placeholderfig{Table: reward and intent-behavioral-divergence for flat, scoring, conditional-concat, and
+conditional-FiLM agents, across intents.}
+\gap{populate the ablation table; the key expected finding is that concatenation shows near-zero
+behavioral divergence across intents while FiLM shows large divergence at comparable or better reward.}
+
+\section{Summary}
+\label{sec:p1eval:summary}
+\gap{write the 2--3 sentence takeaway once the tables are filled: one conditioned scoring policy serves
+the full intent spectrum, matches the best per-intent heuristic while probing far less, and requires
+modulation (not concatenation) to make conditioning effective.}

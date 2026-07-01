@@ -1,0 +1,82 @@
+\chapter{Implementation: SCION Path-Selection Pipeline}
+\label{ch:p1impl}
+
+This chapter describes how the Part~I design is realized: the agent family and their architectures
+(\cref{sec:p1impl:agents}), the end-to-end evaluation pipeline that turns a topology into trained models
+and comparable results (\cref{sec:p1impl:pipeline}), and the baselines and probing accounting against
+which the learned selectors are measured (\cref{sec:p1impl:baselines}). The implementation is in Python
+(PyTorch for the agents) and is organized so that each pipeline stage passes data to the next through
+timestamped run directories.
+
+\section{Agent Family}
+\label{sec:p1impl:agents}
+
+The codebase implements a family of agents of increasing capability, which also serve as the ablation
+ladder in \cref{ch:p1eval}.
+
+\begin{description}
+  \item[Flat DQN (simple / enhanced).] A conventional fixed-action DQN over the 5-dimensional global
+  state. The \emph{simple} variant is a small multilayer perceptron with $\varepsilon$-greedy
+  exploration and a periodic target network; the \emph{enhanced} variant adds Double
+  DQN~\cite{VanHasselt2016}, a dueling head~\cite{Wang2016}, prioritized experience
+  replay~\cite{Schaul2016}, soft target updates, and action masking. These agents cannot handle a
+  variable path set and stand in for the original design~\cite{Bourak2025}.
+  \item[Path-scoring DQN (simple / enhanced).] The permutation-equivariant design of
+  \cref{sec:p1design:scoring}: a shared per-path scorer producing one $Q$-value per path, with variable
+  $N$ handled by padding to the batch maximum and masking. The enhanced variant uses the dueling scoring
+  head, Double DQN, and prioritized replay. This family delivers the dynamic-action property.
+  \item[Conditional path-scoring DQN.] The recommended agent, adding the weight-FiLM dueling head of
+  \cref{sec:p1design:film}. Its global state is extended with the five-dimensional encoded intent vector,
+  and the FiLM sub-network modulates the per-path features feeding the advantage stream. Two intent
+  encodings are supported and recorded in the checkpoint -- the raw weights, or a policy-friendly rescaling
+  to $[-1,1]$ for smoother gradients.
+\end{description}
+
+\paragraph{Training details.} Prioritized replay uses priority exponent $\alpha = 0.6$ with the
+importance-sampling exponent $\beta$ annealed from $0.4$ to $1.0$. Target networks use soft (Polyak)
+updates. Invalid actions are masked to a large negative value both when acting and when forming
+bootstrap targets, so masked paths never contribute to the loss. The conditional agent is trained across
+reward profiles on a stratified schedule (\cref{sec:p1design:film}), so that within a single training run
+the network sees every intent an equal number of times.
+
+\section{Evaluation Pipeline}
+\label{sec:p1impl:pipeline}
+
+The system is driven by a six-stage pipeline, each stage writing artifacts consumed by the next:
+
+\begin{enumerate}
+  \item \textbf{Topology generation} -- BRITE produces an AS graph, converted into SCION roles, ISDs, and
+  links.
+  \item \textbf{Beaconing} -- PCB propagation discovers up/core/down segments and composes candidate paths
+  per source--destination pair.
+  \item \textbf{Traffic simulation} -- 28~days of hourly demand with per-link aggregation, producing the
+  time-varying link states the environment replays.
+  \item \textbf{Training} -- all agent variants are trained on the resulting environment; checkpoints and
+  per-episode statistics are saved.
+  \item \textbf{Evaluation} -- every method (learned and baseline) is run over held-out pairs, hours, and
+  intents, logging reward, achieved latency and bandwidth, probing overhead, and selection time.
+  \item \textbf{Figures} -- results are rendered in a consistent style for the report.
+\end{enumerate}
+
+Running the whole pipeline is a single command; intermediate artifacts (topology, path store, link
+states, checkpoints, results tables) live under a timestamped run directory so that any stage can be
+re-run or inspected in isolation. Key knobs -- topology size, number of training episodes, the cap on
+training pairs, and learning hyperparameters -- are exposed as configuration so that experiments can be
+scaled up or down.
+
+\section{Baselines and Probing Accounting}
+\label{sec:p1impl:baselines}
+
+\paragraph{Baselines.} Six heuristic selectors provide the comparison points: shortest-path,
+widest-path, lowest-latency, ECMP, the SCION default selection, and random. They span the spectrum from
+naive (random) to strong single-metric heuristics (widest for throughput, lowest-latency for delay), so
+that the learned selectors must beat not just a weak baseline but the \emph{right} heuristic for each
+intent.
+
+\paragraph{Probing accounting.} A fair comparison must charge each method for the measurements it needs.
+The environment therefore records, per decision, which paths a method probed and at what cost -- latency
+probes being cheap and full bandwidth probes expensive (\cref{sec:p1design:env}). Heuristics that require
+a metric on every path (e.g.\ widest-path) incur the cost of probing all paths, whereas the learned
+selector is charged only for the paths it actually inspects. This makes the probing-overhead reduction a
+directly measurable quantity rather than an assumed benefit, and is the mechanism by which we reproduce
+and test the near-oracle-quality-at-low-probing claim of Bourak~et~al.~\cite{Bourak2025}.

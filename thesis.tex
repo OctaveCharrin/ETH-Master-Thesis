@@ -1,0 +1,81 @@
+\documentclass[
+    a4paper,
+    toc=index,
+    12pt,
+    DIV=14,
+    twoside,
+    BCOR=2cm,
+    headsepline,
+    numbers=noenddot,
+    bibliography=totoc,
+]{scrbook}
+
+\usepackage{scrhack}
+\usepackage[utf8]{inputenc}
+\DeclareUnicodeCharacter{00A0}{~}   % replace non-breaking space
+\usepackage[T1]{fontenc}
+\usepackage[american]{babel}    % Use either American or British English consistently
+
+\newcommand{\thesisTitle}{Intent-Conditioned Reinforcement Learning for Path Selection and Multipath Optimization in SCION}
+\newcommand{\thesisType}{Master's Thesis}
+\newcommand{\thesisAuthor}{Octave Charrin}
+\newcommand{\thesisStudentID}{24-937-385}
+\newcommand{\thesisEmail}{ocharrin@ethz.ch}
+\newcommand{\thesisSupervisors}{Liwen Xu\\Prof.~Dr.~Adrian Perrig}
+
+\newcommand{\thesisSemester}{Spring 2026}
+\newcommand{\thesisSubmission}{August 25, 2026}
+
+\input{format}
+
+\begin{document}
+
+\frontmatter
+
+\include{title}
+
+\include{sections/0_abstract}
+\include{sections/0_acknowledgements}
+
+\tableofcontents
+
+\mainmatter
+
+% ---- Shared framing ----
+\include{sections/1_introduction}
+\include{sections/2_background}
+\include{sections/3_problem}
+
+% ---- Part I: Intent-aware path selection in SCION ----
+\part{Intent-Aware Path Selection in SCION}
+\include{sections/p1_1_design}
+\include{sections/p1_2_implementation}
+\include{sections/p1_3_evaluation}
+
+% ---- Part II: Joint application--network optimization over multipath ----
+\part{Joint Application--Network Optimization over Multipath}
+\include{sections/p2_1_design}
+\include{sections/p2_2_implementation}
+\include{sections/p2_3_evaluation}
+
+% ---- Part III: Synthesis and outlook ----
+\part{Synthesis and Outlook}
+\include{sections/9_analysis}
+\include{sections/8_discussion}
+\include{sections/9_related-work}
+\include{sections/10_conclusion}
+
+\bibliographystyle{abbrv}
+\bibliography{bibliography}
+
+\appendix
+\include{sections/appendix}
+
+\cleardoublepage
+\phantomsection{}
+\addcontentsline{toc}{chapter}{Declaration of Originality}
+% TODO: place the signed declaration scan at ../resources/declaration-originality.pdf
+%       and re-enable the line below for the final submission.
+% \includepdf[pages={-}]{../resources/declaration-originality.pdf} % replace with scan
+
+\end{document}

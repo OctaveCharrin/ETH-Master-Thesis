@@ -1,0 +1,147 @@
+\chapter{Background}
+\label{ch:background}
+
+This chapter reviews the systems and techniques the thesis builds on. \Cref{sec:background:scion}
+introduces the SCION path-aware Internet architecture and the path-selection opportunity it
+creates. \Cref{sec:background:rl} recalls the reinforcement-learning (RL) machinery used in both
+parts: the Markov decision process, deep $Q$-networks and their standard refinements, soft
+actor-critic, and the handling of variable action spaces. \Cref{sec:background:intent} covers the
+mechanisms for conditioning a policy on application intent -- goal-conditioned RL and feature-wise
+linear modulation -- and situates them against the Mortise congestion-control tuner that inspires
+this work. \Cref{sec:background:qoe} introduces the quality-of-experience and multipath-transport
+concepts specific to Part~II.
+
+\section{SCION}
+\label{sec:background:scion}
+
+SCION~\cite{Perrig2017} is a next-generation, path-aware Internet architecture designed for high
+availability and transparency of the forwarding path. Its defining departure from today's Internet
+is that \emph{end hosts, not intermediate routers, choose the path a packet takes}. The network is
+organized into \emph{isolation domains} (ISDs), each governed by a set of core autonomous systems
+(ASes). Path segments are discovered by a beaconing process: core ASes flood \emph{path-segment
+construction beacons} (PCBs) that accumulate hop information as they propagate, giving rise to three
+segment types -- \emph{up} segments from a leaf AS to its ISD core, \emph{core} segments between
+core ASes across ISDs, and \emph{down} segments from a core to a destination leaf. An end host
+combines an up, an (optional) core, and a down segment into a complete forwarding path and embeds it
+in the packet header.
+
+Two properties of SCION matter for this thesis. First, \textbf{path multiplicity}: a source--
+destination pair is typically connected by \emph{several} distinct paths that differ in latency,
+available bandwidth, loss, and the ASes they traverse. This is precisely the raw material a
+path-selection agent needs, and the same multiplicity is what makes multipath transport natural in
+Part~II. Second, \textbf{path transparency and trust}: because the full AS-level path is visible to
+the endpoint, an agent can reason about properties beyond raw performance -- for instance a
+\emph{trust} score that reflects how much confidence to place in a path's advertised or measured
+quality. We exploit this in Part~I, where the reward balances measured goodput against a trust term.
+The flip side of endpoint path choice is a coordination problem: whereas a router runs one routing
+process, every SCION host must decide for itself, ideally without flooding the network with probes.
+Minimizing that probing overhead is an explicit objective throughout Part~I.
+
+\section{Reinforcement Learning}
+\label{sec:background:rl}
+
+\subsection{Markov decision processes}
+We model path and rate control as sequential decision-making in a Markov decision process (MDP)
+$(\mathcal{S}, \mathcal{A}, P, r, \gamma)$, where at each step the agent observes a state
+$s \in \mathcal{S}$, takes an action $a \in \mathcal{A}$, receives a scalar reward
+$r(s,a)$, and transitions to $s'$ with probability $P(s' \mid s, a)$. The agent seeks a policy
+$\pi$ that maximizes the expected discounted return $\mathbb{E}\!\left[\sum_t \gamma^t r_t\right]$
+with discount $\gamma \in [0,1)$. The reward function is where application intent enters: by
+changing what the agent is rewarded for, we change what ``best'' means.
+
+\subsection{Deep $Q$-networks and refinements}
+The action-value function $Q^\pi(s,a) = \mathbb{E}[\sum_t \gamma^t r_t \mid s_0=s, a_0=a]$ gives the
+expected return of taking $a$ in $s$ and following $\pi$ thereafter. A deep $Q$-network
+(DQN)~\cite{Mnih2015} approximates the optimal $Q^\star$ with a neural network trained to minimize
+the temporal-difference error against a slowly updated \emph{target} network, sampling transitions
+from a replay buffer to decorrelate them. Part~I uses three standard refinements. \emph{Double
+DQN}~\cite{VanHasselt2016} decouples action selection from action evaluation in the bootstrap
+target, reducing the overestimation bias of vanilla DQN. The \emph{dueling}
+architecture~\cite{Wang2016} factors $Q(s,a) = V(s) + \big(A(s,a) - \tfrac{1}{|\mathcal{A}|}\sum_{a'}
+A(s,a')\big)$ into a state-value stream $V$ and an advantage stream $A$, which helps when many
+actions have similar value -- as when several paths are comparably good. \emph{Prioritized
+experience replay} (PER)~\cite{Schaul2016} samples high-error transitions more often, correcting the
+resulting bias with importance-sampling weights.
+
+\subsection{Soft actor-critic}
+Part~II controls \emph{continuous} quantities -- a target bitrate and a split ratio over paths -- for
+which value-based DQN is ill-suited. We use soft actor-critic (SAC)~\cite{Haarnoja2018}, an
+off-policy, maximum-entropy actor-critic method. SAC augments the reward with a policy-entropy term,
+$\mathbb{E}[\sum_t \gamma^t (r_t + \alpha \mathcal{H}(\pi(\cdot\mid s_t)))]$, which encourages
+exploration and robustness; it trains twin $Q$-critics to curb overestimation and can tune the
+temperature $\alpha$ automatically against a target entropy. SAC's sample efficiency and stability
+make it a good fit for the expensive, noisy rollouts of a packet-level network simulator.
+
+\subsection{Variable and structured action spaces}
+\label{sec:background:variable}
+A subtle but central difficulty is that the number of candidate paths is not fixed: it varies across
+source--destination pairs and over time. A classical DQN with a fixed output head cannot represent
+this. The remedy, used in both parts, is a \emph{scoring} architecture that is
+\emph{permutation-equivariant} over the path set: a shared network maps each path's feature vector
+(together with a global context) to a scalar score, and the scores are compared -- by
+$\arg\max$ for discrete selection in Part~I, or by a softmax to produce a traffic split in Part~II.
+Invalid or absent paths are masked out. Aggregating a set of per-element embeddings in a way that is
+invariant to their ordering is the Deep Sets construction~\cite{Zaheer2017}, which we use in Part~II's
+critic. This design decouples the policy from the cardinality of the action set and lets a single
+network generalize across topologies with different numbers of paths.
+
+\section{Conditioning Policies on Application Intent}
+\label{sec:background:intent}
+
+\subsection{Goal-conditioned reinforcement learning}
+A policy that must serve many objectives can be made a function of the objective itself. In
+goal-conditioned RL, the policy $\pi(a \mid s, g)$ and value function are conditioned on a goal $g$,
+so that one network represents a whole family of behaviors. Universal value function approximators
+(UVFAs)~\cite{Schaul2015} formalize this by learning $V(s, g)$ jointly over states and goals, and
+hindsight experience replay~\cite{Andrychowicz2017} makes it sample-efficient by relabeling failed
+trajectories with the goals they did achieve. In this thesis the ``goal'' is application intent,
+encoded as a vector of reward weights: the agent is told, at both training and inference time, how
+much it should care about throughput versus latency versus trust, and is expected to act accordingly.
+
+\subsection{Feature-wise linear modulation}
+\emph{How} the intent vector influences the network turns out to matter a great deal. The mechanism
+we adopt is feature-wise linear modulation (FiLM)~\cite{Perez2018}: a small conditioning network maps
+the intent vector to per-feature scale and shift parameters $(\gamma, \beta)$, which affinely
+transform an intermediate feature representation $h$ as $\mathrm{FiLM}(h) = (1 + \gamma) \odot h +
+\beta$. Because the modulation is multiplicative, it can change the \emph{relative} importance of
+different path features -- amplifying latency for a real-time intent, amplifying bandwidth for a bulk
+intent -- and therefore change which path scores highest. As we argue in \cref{ch:p1design}, this is
+the property that a mere concatenation of the intent vector onto the state lacks: appending a constant
+to every path's input tends to shift all path scores together, leaving the $\arg\max$ unchanged.
+
+\subsection{Mortise: intent-driven tuning of a transport mechanism}
+The conceptual template for both parts is Mortise~\cite{Shen2026}. Mortise observes that a single
+congestion-control algorithm cannot be optimal for every application, and instead \emph{auto-tunes}
+the algorithm's parameters to maximize the running application's QoE, using the application's revealed
+preferences over throughput, latency, and loss to steer the tuning. The essential idea -- treat
+application intent as a first-class input that reshapes a network mechanism rather than a constant
+compiled into it -- is exactly what we transplant. Part~I applies it to \emph{path selection} (which
+path to use), and Part~II applies it to \emph{joint rate and multipath scheduling} (what the
+application sends and how it is spread across paths).
+
+\section{Quality of Experience and Multipath Transport}
+\label{sec:background:qoe}
+
+\subsection{Quality of experience for real-time video}
+Part~II targets interactive video, whose value to a user is captured by quality-of-experience (QoE)
+rather than any single network metric. Perceptual quality at a given encoding is commonly summarized
+by VMAF~\cite{VMAF2016}, a learned metric that predicts subjective video quality; interactivity adds
+sensitivity to end-to-end latency, jitter, and frame loss, since a late frame in a live call is a lost
+frame. Part~II's reward composes a VMAF-based quality term with penalties for latency, jitter, and
+loss, making the QoE objective explicit and tunable.
+
+\subsection{Adaptive bitrate and learned control}
+The application-side lever in Part~II is adaptive bitrate (ABR) control: choosing the video encoder's
+target rate to match available capacity. Learned ABR controllers such as Pensieve~\cite{Mao2017}
+showed that RL can outperform hand-crafted heuristics for buffered video streaming. Our setting differs
+in two ways: it is real-time (no large playback buffer to hide variance), and the bitrate decision is
+coupled to a simultaneous \emph{network-side} decision about how to use multiple paths.
+
+\subsection{Multipath QUIC}
+QUIC~\cite{RFC9000} is a modern, encrypted, multiplexed transport running over UDP. Multipath
+QUIC~\cite{DeConinck2017} extends it to send a single connection's data across several network paths at
+once, in the spirit of Multipath TCP~\cite{RFC8684} but with QUIC's flexibility and user-space
+deployability. Over a path-aware substrate like SCION, the several paths are readily available from
+path selection, which makes MPQUIC a natural transport for exploiting SCION's path multiplicity. The
+open question MPQUIC raises -- how to \emph{schedule} bytes across heterogeneous paths -- is one of the
+two decisions Part~II learns.

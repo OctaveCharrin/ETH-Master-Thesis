@@ -1,0 +1,25 @@
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+
+The Internet forwards packets without regard for why they were sent, so the network optimizes a target
+that rarely matches what an application actually values. Path-aware architectures such as SCION change
+this by letting endpoints choose among multiple end-to-end paths, placing the path decision in the hands
+of the one party that knows the application's intent. This thesis studies how to make that choice well:
+how to select the best path -- or the best combination of paths -- given both the application's intent and
+the current state of the network.
+
+We take a single idea from recent congestion-control work, that application intent should be a first-class
+input which reshapes a network mechanism, and push it into two settings. First, we turn a fixed-objective
+DQN path selector for SCION into an intent-conditioned one, combining a permutation-equivariant scoring
+architecture that handles a variable, changing set of candidate paths with feature-wise modulation of path
+features by an intent vector; a single policy then serves a spectrum of objectives -- throughput,
+latency, trust, probe-frugality -- without retraining. We show, analytically and empirically, that
+conditioning must \emph{modulate} the decision rather than merely accompany it, since an additive signal
+cancels under the comparison that selects a path. Second, we ask what happens when several paths are used
+at once and the application is optimized alongside the network: a two-timescale hierarchical pair of
+reinforcement-learning agents co-optimizes a real-time video call's encoding bitrate and its per-path
+traffic split over Multipath QUIC. Here the central finding is that the value of learned multipath
+scheduling depends sharply on network volatility -- nearly negligible when paths are stable, but decisive
+under path churn and congestion bursts, where controlling the application alone collapses. Together the two
+parts argue that on a path-aware Internet, application intent should steer every controllable decision
+between the application and the wire, and they chart what remains to make such control deployable.

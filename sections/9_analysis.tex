@@ -1,0 +1,82 @@
+\chapter{Analysis}
+\label{ch:analysis}
+
+This chapter analyzes the two systems along the dimensions that determine whether learned path control is
+practical, replacing the security-centric analysis of the original template (as motivated in
+\cref{sec:problem:trust}) with the concerns that actually govern deployment: overhead
+(\cref{sec:analysis:overhead}), scalability (\cref{sec:analysis:scalability}), generalization
+(\cref{sec:analysis:generalization}), and deployability (\cref{sec:analysis:deployability}). Where a claim
+depends on measurements still in progress, it is marked.
+
+\section{Overhead}
+\label{sec:analysis:overhead}
+
+Two kinds of overhead matter: measurement and computation.
+
+\paragraph{Measurement (probing) overhead.} In Part~I, probing is a first-class cost charged in the reward
+(\cref{eq:p1reward}) and accounted per decision (\cref{sec:p1impl:baselines}). The learned selector probes
+only the paths it inspects, in contrast to heuristics that require a metric on every path, so its
+measurement footprint is intended to be a fraction of an exhaustive scan at comparable selection quality --
+the property we test in \cref{sec:p1eval:overhead}. In Part~II, per-path state is derived from ordinary
+transport feedback (RTT samples, acknowledgements, loss signals) rather than dedicated probes, so the
+marginal measurement cost of the split decision is low.
+
+\paragraph{Computational overhead.} Both policies are small neural networks evaluated once per decision.
+The Part~I selector runs at path-selection granularity (seconds to minutes) and is comfortably cheap. The
+Part~II transport agent is the tighter constraint: it runs \emph{per frame} (${\approx}\SI{33}{\milli\second}$
+at 30\,fps), so its inference must fit well inside a frame interval. The scoring architecture keeps this
+affordable -- a shared per-path encoder evaluated $N$ times and a softmax -- but the per-frame budget is the
+binding real-time constraint. \gap{report measured per-decision inference latency for both agents, and
+confirm the transport agent's inference fits within the frame budget on the target hardware.}
+
+\section{Scalability}
+\label{sec:analysis:scalability}
+
+The scoring architecture is what makes both systems scale in the number of paths. Because a shared network
+scores each path independently and decisions are made by comparison (\cref{sec:p1design:scoring}) or softmax
+(\cref{sec:p2design:scoring}), the parameter count is independent of $N$, and inference is linear in $N$.
+This lets one trained model serve source--destination pairs with any number of paths and topologies of any
+size, without retraining or padding to a fixed maximum -- the limitation of the flat agents. The remaining
+scalability question is training coverage: the environment must expose enough variety of path counts,
+topologies, and conditions for the shared scorer to generalize. \gap{report how selection quality holds as
+topology size and path count grow, ideally on topologies larger than those seen in training.}
+
+\section{Generalization}
+\label{sec:analysis:generalization}
+
+Generalization is required along three axes. \textbf{Across intents:} Part~I's FiLM conditioning is meant to
+interpolate to intents between (and, ideally, beyond) the trained reward profiles, so that a novel weight
+vector yields sensible behavior without retraining -- tested in \cref{sec:p1eval:intent}. \textbf{Across
+topologies and path counts:} the permutation-equivariant design gives structural generalization, but only
+empirical results can confirm it holds off the training distribution. \textbf{Across conditions:} the
+dynamic scenario of Part~II (\cref{sec:p2eval:results}) is itself a generalization stress test, since the
+policy must cope with churn and bursts rather than a stationary environment; the collapse of the
+fixed-schedule baselines there shows that static policies do \emph{not} generalize across volatility, which
+is the gap learned control fills. \gap{quantify off-distribution degradation for both systems -- unseen
+intents, larger topologies, and unseen dynamics regimes -- to bound how gracefully performance decays.}
+
+\section{Deployability}
+\label{sec:analysis:deployability}
+
+Several gaps separate these prototypes from a deployment.
+
+\begin{itemize}
+  \item \textbf{From simulation to reality.} Both systems are trained in simulation. Part~I relies on a
+  synthetic traffic and beaconing environment; Part~II on NS-3 and a mock. A sim-to-real transfer -- domain
+  randomization, or online fine-tuning against live measurements -- would be needed before deployment, and
+  the packet-level NS-3 backend is the intended stepping stone (\cref{sec:p2impl:gaps}).
+  \item \textbf{Real transport.} Part~II models subflows with TCP-like congestion control rather than true
+  Multipath QUIC~\cite{DeConinck2017}; a real QUIC integration is required to validate the per-frame
+  scheduling under an actual multipath transport.
+  \item \textbf{Online and safe learning.} A deployed agent would learn or adapt against live traffic, where
+  exploration has real cost. Bounding worst-case behavior -- e.g.\ falling back to a safe heuristic when the
+  policy is uncertain, or constraining exploration -- is a prerequisite we do not address here.
+  \item \textbf{Trust and integrity.} As noted in \cref{sec:problem:trust}, the agents assume honest
+  measurements. A deployment must verify measurement integrity and bound the damage a single misreported
+  path can cause; Part~I's trust term is a partial hedge, not a solution.
+\end{itemize}
+
+On the positive side, two properties aid deployability: the endpoint-driven nature of SCION path selection
+means these controllers need no network-internal changes, and the horizon-agnostic application agent
+(\cref{sec:p2design:hierarchy}) is designed to run in unbounded real sessions rather than fixed-length
+episodes.

@@ -1,0 +1,69 @@
+\chapter{Related Work}
+\label{ch:related}
+
+Where \cref{ch:background} covered the systems this thesis \emph{builds on}, this chapter surveys work that
+attacks the \emph{same or similar problems} and positions our contributions against it. We group it into
+learned routing and traffic engineering (\cref{sec:rel:routing}), learned congestion control and multipath
+scheduling (\cref{sec:rel:transport}), adaptive bitrate and QoE-driven control (\cref{sec:rel:abr}),
+goal-conditioned and modulated policies (\cref{sec:rel:gcrl}), and intent-based networking
+(\cref{sec:rel:ibn}).
+
+\section{Learned Routing and Traffic Engineering}
+\label{sec:rel:routing}
+
+A line of work applies reinforcement learning to routing and traffic engineering. \emph{Learning to
+Route}~\cite{Valadarsky2017} studies RL and learned representations for routing, and experience-driven
+networking~\cite{Xu2018} uses deep RL for traffic-engineering decisions. These target network-operator
+objectives (e.g.\ minimizing congestion globally) from a control-plane vantage point. Our Part~I differs in
+both the actor and the objective: the decision is made by an \emph{endpoint} choosing among
+cryptographically authenticated SCION paths, and the objective is the \emph{application's} intent rather than
+a global network utility. Most directly related is the DQN SCION path selector of
+Bourak~et~al.~\cite{Bourak2025}, which we extend; the differences -- a variable-action scoring architecture
+and FiLM-based intent conditioning that removes the single-objective limitation -- are the substance of
+Part~I.
+
+\section{Learned Congestion Control and Multipath Scheduling}
+\label{sec:rel:transport}
+
+Learned transport controllers include Aurora~\cite{Jay2019}, which casts congestion control as RL, and
+Orca~\cite{Abbasloo2020}, which combines a learned layer with a classic controller. Mortise~\cite{Shen2026}
+is the closest in spirit: it auto-tunes congestion-control parameters to the running application's QoE, and
+its principle -- intent as an input that reshapes a mechanism -- is the template we transplant into path
+selection and joint multipath control. For multipath \emph{scheduling}, ReLeS~\cite{Zhang2019} learns a
+Multipath QUIC scheduler and Peekaboo~\cite{Wu2020} learns to schedule across heterogeneous paths in dynamic
+environments; both optimize a scheduling policy for a given, exogenous load. Part~II's distinction is that it
+does \emph{not} treat the offered load as fixed: it co-optimizes the application's bitrate with the split, so
+the controller can relieve congestion it would otherwise create -- a coupling those schedulers, and the
+Multipath TCP mechanisms of RFC~8684~\cite{RFC8684}, do not address.
+
+\section{Adaptive Bitrate and QoE-Driven Control}
+\label{sec:rel:abr}
+
+Learned adaptive bitrate control, exemplified by Pensieve~\cite{Mao2017}, showed RL beating hand-crafted ABR
+heuristics for buffered video streaming, using QoE-shaped rewards and quality metrics such as
+VMAF~\cite{VMAF2016}. Our Part~II shares the QoE-driven, learned-bitrate stance but targets \emph{real-time}
+video (no playback buffer, deadline-based loss) and, crucially, couples the bitrate decision to a
+simultaneous multipath scheduling decision. Where Pensieve adapts rate to a single, exogenous network path,
+we adapt rate \emph{and} decide how to spread it across several paths, jointly.
+
+\section{Goal-Conditioned and Modulated Policies}
+\label{sec:rel:gcrl}
+
+The machinery for serving many objectives with one policy comes from goal-conditioned RL -- universal value
+function approximators~\cite{Schaul2015} and hindsight relabeling~\cite{Andrychowicz2017} -- and from
+conditioning mechanisms such as FiLM~\cite{Perez2018}, originally introduced for visual reasoning. Our
+contribution is not the mechanism but its application and a specific insight about \emph{where} it is
+necessary: for a comparison-based (argmax or softmax) selector, we show conditioning must modulate the
+per-alternative features, because an additive, symmetric signal cancels under the comparison
+(\cref{sec:p1design:film}). This connects a general representation-learning tool to a concrete failure mode
+in networked decision-making.
+
+\section{Intent-Based Networking}
+\label{sec:rel:ibn}
+
+Finally, ``intent'' also names a body of network-management work concerned with translating high-level
+operator goals into configuration, surveyed in RFC~9315~\cite{RFC9315}. That community's ``intent'' is an
+operator's declarative policy for a whole network; ours is an \emph{application's} per-flow QoS preference
+consumed by a learned endpoint controller. The two are complementary rather than competing -- one could
+imagine operator intent bounding the space in which application intent is served -- but they operate at
+different layers and timescales, and our techniques address the fine-grained, per-flow end of the spectrum.
