@@ -78,29 +78,3 @@ We make the following assumptions explicit.
   over the short interval of a single decision, though they may drift or shift abruptly between epochs;
   the non-stationary regimes we study (\cref{ch:p2eval}) stress exactly this assumption.
 \end{enumerate}
-
-\section{Deployment and Trust Assumptions}
-\label{sec:problem:trust}
-
-This thesis is a performance and control study, not a security study, so in place of a classical
-attacker model we state the trust assumptions under which the learned controllers operate and note
-where security considerations would enter a real deployment.
-
-\begin{itemize}
-  \item \textbf{Honest measurements.} We assume that the per-path measurements an agent acts on --
-  whether obtained by active probing (Part~I) or transport feedback (Part~II) -- are honest. A
-  malicious on-path element that fabricates favorable metrics could steer an agent toward a bad path;
-  defending against this is out of scope, though the trust term below offers partial mitigation.
-  \item \textbf{SCION path authenticity and trust.} SCION's cryptographically authenticated paths mean
-  an agent knows \emph{which} ASes a path traverses and cannot be silently redirected. Part~I's reward
-  includes a \emph{trust} component derived from path quality, letting the agent prefer
-  higher-confidence paths and discount those with anomalous loss or latency -- a lightweight hedge
-  against unreliable or adversarial path advertisement rather than a full defense.
-  \item \textbf{No adversarial control of the learner.} We assume the agent's own training and
-  inference pipeline is trusted; adversarial manipulation of the RL policy (e.g.\ reward poisoning or
-  observation attacks) is beyond this work.
-\end{itemize}
-
-A production deployment would need to revisit these assumptions -- in particular, verifying measurement
-integrity and bounding the damage a single misreported path can do. We return to the deployability
-question in \cref{ch:analysis,ch:discussion}.
