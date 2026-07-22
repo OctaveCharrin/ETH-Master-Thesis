@@ -37,6 +37,57 @@ The flip side of endpoint path choice is a coordination problem: whereas a route
 process, every SCION host must decide for itself, ideally without flooding the network with probes.
 Minimizing that probing overhead is an explicit objective throughout Part~I.
 
+\section{Conditioning Policies on Application Intent}
+\label{sec:background:intent}
+
+\subsection{Goal-conditioned reinforcement learning}
+A policy that must serve many objectives can be made a function of the objective itself. In
+goal-conditioned RL, the policy $\pi(a \mid s, g)$ and value function are conditioned on a goal $g$,
+so that one network represents a whole family of behaviors. Universal value function approximators
+(UVFAs)~\cite{Schaul2015} formalize this by learning $V(s, g)$ jointly over states and goals, and
+hindsight experience replay~\cite{Andrychowicz2017} makes it sample-efficient by relabeling failed
+trajectories with the goals they did achieve. In this thesis the ``goal'' is application intent,
+encoded as a vector of reward weights: the agent is told, at both training and inference time, how
+much it should care about throughput versus latency versus trust, and is expected to act accordingly.
+
+\subsection{Feature-wise linear modulation}
+\emph{How} the intent vector influences the network turns out to matter a great deal. The mechanism
+we adopt is feature-wise linear modulation (FiLM)~\cite{Perez2018}: a small conditioning network maps
+the intent vector to per-feature scale and shift parameters $(\gamma, \beta)$, which affinely
+transform an intermediate feature representation $h$ as $\mathrm{FiLM}(h) = (1 + \gamma) \odot h +
+\beta$. Because the modulation is multiplicative, it can change the \emph{relative} importance of
+different path features -- amplifying latency for a real-time intent, amplifying bandwidth for a bulk
+intent -- and therefore change which path scores highest. As we argue in \cref{ch:p1design}, this is
+the property that a mere concatenation of the intent vector onto the state lacks: appending a constant
+to every path's input tends to shift all path scores together, leaving the $\arg\max$ unchanged.
+
+\section{Quality of Experience and Multipath Transport}
+\label{sec:background:qoe}
+
+\subsection{Quality of experience for real-time video}
+Part~II targets interactive video, whose value to a user is captured by quality-of-experience (QoE)
+rather than any single network metric. Perceptual quality at a given encoding is commonly summarized
+by VMAF~\cite{VMAF2016}, a learned metric that predicts subjective video quality; interactivity adds
+sensitivity to end-to-end latency, jitter, and frame loss, since a late frame in a live call is a lost
+frame. Part~II's reward composes a VMAF-based quality term with penalties for latency, jitter, and
+loss, making the QoE objective explicit and tunable.
+
+\subsection{Adaptive bitrate and learned control}
+The application-side lever in Part~II is adaptive bitrate (ABR) control: choosing the video encoder's
+target rate to match available capacity. Learned ABR controllers such as Pensieve~\cite{Mao2017}
+showed that RL can outperform hand-crafted heuristics for buffered video streaming. Our setting differs
+in two ways: it is real-time (no large playback buffer to hide variance), and the bitrate decision is
+coupled to a simultaneous \emph{network-side} decision about how to use multiple paths.
+
+\subsection{Multipath QUIC}
+QUIC~\cite{RFC9000} is a modern, encrypted, multiplexed transport running over UDP. Multipath
+QUIC~\cite{DeConinck2017} extends it to send a single connection's data across several network paths at
+once, in the spirit of Multipath TCP~\cite{RFC8684} but with QUIC's flexibility and user-space
+deployability. Over a path-aware substrate like SCION, the several paths are readily available from
+path selection, which makes MPQUIC a natural transport for exploiting SCION's path multiplicity. The
+open question MPQUIC raises -- how to \emph{schedule} bytes across heterogeneous paths -- is one of the
+two decisions Part~II learns.
+
 \section{Reinforcement Learning}
 \label{sec:background:rl}
 
@@ -84,64 +135,3 @@ Invalid or absent paths are masked out. Aggregating a set of per-element embeddi
 invariant to their ordering is the Deep Sets construction~\cite{Zaheer2017}, which we use in Part~II's
 critic. This design decouples the policy from the cardinality of the action set and lets a single
 network generalize across topologies with different numbers of paths.
-
-\section{Conditioning Policies on Application Intent}
-\label{sec:background:intent}
-
-\subsection{Goal-conditioned reinforcement learning}
-A policy that must serve many objectives can be made a function of the objective itself. In
-goal-conditioned RL, the policy $\pi(a \mid s, g)$ and value function are conditioned on a goal $g$,
-so that one network represents a whole family of behaviors. Universal value function approximators
-(UVFAs)~\cite{Schaul2015} formalize this by learning $V(s, g)$ jointly over states and goals, and
-hindsight experience replay~\cite{Andrychowicz2017} makes it sample-efficient by relabeling failed
-trajectories with the goals they did achieve. In this thesis the ``goal'' is application intent,
-encoded as a vector of reward weights: the agent is told, at both training and inference time, how
-much it should care about throughput versus latency versus trust, and is expected to act accordingly.
-
-\subsection{Feature-wise linear modulation}
-\emph{How} the intent vector influences the network turns out to matter a great deal. The mechanism
-we adopt is feature-wise linear modulation (FiLM)~\cite{Perez2018}: a small conditioning network maps
-the intent vector to per-feature scale and shift parameters $(\gamma, \beta)$, which affinely
-transform an intermediate feature representation $h$ as $\mathrm{FiLM}(h) = (1 + \gamma) \odot h +
-\beta$. Because the modulation is multiplicative, it can change the \emph{relative} importance of
-different path features -- amplifying latency for a real-time intent, amplifying bandwidth for a bulk
-intent -- and therefore change which path scores highest. As we argue in \cref{ch:p1design}, this is
-the property that a mere concatenation of the intent vector onto the state lacks: appending a constant
-to every path's input tends to shift all path scores together, leaving the $\arg\max$ unchanged.
-
-\subsection{Mortise: intent-driven tuning of a transport mechanism}
-The conceptual template for both parts is Mortise~\cite{Shen2026}. Mortise observes that a single
-congestion-control algorithm cannot be optimal for every application, and instead \emph{auto-tunes}
-the algorithm's parameters to maximize the running application's QoE, using the application's revealed
-preferences over throughput, latency, and loss to steer the tuning. The essential idea -- treat
-application intent as a first-class input that reshapes a network mechanism rather than a constant
-compiled into it -- is exactly what we transplant. Part~I applies it to \emph{path selection} (which
-path to use), and Part~II applies it to \emph{joint rate and multipath scheduling} (what the
-application sends and how it is spread across paths).
-
-\section{Quality of Experience and Multipath Transport}
-\label{sec:background:qoe}
-
-\subsection{Quality of experience for real-time video}
-Part~II targets interactive video, whose value to a user is captured by quality-of-experience (QoE)
-rather than any single network metric. Perceptual quality at a given encoding is commonly summarized
-by VMAF~\cite{VMAF2016}, a learned metric that predicts subjective video quality; interactivity adds
-sensitivity to end-to-end latency, jitter, and frame loss, since a late frame in a live call is a lost
-frame. Part~II's reward composes a VMAF-based quality term with penalties for latency, jitter, and
-loss, making the QoE objective explicit and tunable.
-
-\subsection{Adaptive bitrate and learned control}
-The application-side lever in Part~II is adaptive bitrate (ABR) control: choosing the video encoder's
-target rate to match available capacity. Learned ABR controllers such as Pensieve~\cite{Mao2017}
-showed that RL can outperform hand-crafted heuristics for buffered video streaming. Our setting differs
-in two ways: it is real-time (no large playback buffer to hide variance), and the bitrate decision is
-coupled to a simultaneous \emph{network-side} decision about how to use multiple paths.
-
-\subsection{Multipath QUIC}
-QUIC~\cite{RFC9000} is a modern, encrypted, multiplexed transport running over UDP. Multipath
-QUIC~\cite{DeConinck2017} extends it to send a single connection's data across several network paths at
-once, in the spirit of Multipath TCP~\cite{RFC8684} but with QUIC's flexibility and user-space
-deployability. Over a path-aware substrate like SCION, the several paths are readily available from
-path selection, which makes MPQUIC a natural transport for exploiting SCION's path multiplicity. The
-open question MPQUIC raises -- how to \emph{schedule} bytes across heterogeneous paths -- is one of the
-two decisions Part~II learns.

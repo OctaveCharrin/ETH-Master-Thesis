@@ -46,6 +46,17 @@ video (no playback buffer, deadline-based loss) and, crucially, couples the bitr
 simultaneous multipath scheduling decision. Where Pensieve adapts rate to a single, exogenous network path,
 we adapt rate \emph{and} decide how to spread it across several paths, jointly.
 
+
+\subsection{Mortise: intent-driven tuning of a transport mechanism}
+The conceptual template for both parts is Mortise~\cite{Shen2026}. Mortise observes that a single
+congestion-control algorithm cannot be optimal for every application, and instead \emph{auto-tunes}
+the algorithm's parameters to maximize the running application's QoE, using the application's revealed
+preferences over throughput, latency, and loss to steer the tuning. The essential idea -- treat
+application intent as a first-class input that reshapes a network mechanism rather than a constant
+compiled into it -- is exactly what we transplant. Part~I applies it to \emph{path selection} (which
+path to use), and Part~II applies it to \emph{joint rate and multipath scheduling} (what the
+application sends and how it is spread across paths).
+
 \section{Goal-Conditioned and Modulated Policies}
 \label{sec:rel:gcrl}
 
