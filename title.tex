@@ -6,7 +6,7 @@
 {
     % TODO: drop the official ETHlogo (pdf/png) into ../resources or figures/
     %       and re-enable the line below; a text placeholder is used until then.
-    \includegraphics[width=5cm]{ETHlogo}
+    \hspace*{-6mm}\includegraphics[width=5cm]{ETHlogo}
     % \includegraphics[width=5cm]{images/logos/logo_group}
 }
 
@@ -18,9 +18,29 @@ Network Security Group, Department of Computer Science, ETH Zurich
 \vfill
 \vfill
 
+% \begin{center}
+%     {\Huge \sffamily \bfseries \thesisTitle}\\[10mm]
+%     {\Large by \thesisAuthor}\\[8mm]
+%     {\large \thesisSemester}
+% \end{center}
+
 \begin{center}
-    {\Huge \sffamily \bfseries \thesisTitle}\\[10mm]
-    {\Large by \thesisAuthor}\\[8mm]
+    % Main Title
+    {\fontsize{24pt}{30pt}\selectfont \sffamily \bfseries
+        Intent-Driven Network Control in SCION\par
+    }
+    
+    \vspace{2mm}
+    
+    % Subtitle
+    {\fontsize{18pt}{20pt}\selectfont \sffamily \bfseries \color{black!70}
+        From Single-Path Selection to Joint Application-Multipath Co-Optimization\par
+    }
+    
+    \vspace{12mm}
+    
+    % Author & Semester Block
+    {\Large by \thesisAuthor}\\[4mm]
     {\large \thesisSemester}
 \end{center}
 
