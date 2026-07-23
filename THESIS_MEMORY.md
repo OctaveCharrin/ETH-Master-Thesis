@@ -28,56 +28,60 @@ Rather than splitting the work into disconnected parts, the thesis follows a **u
 
 ## 2. Updated Linear Table of Contents Structure
 
-The thesis has been refactored from a rigid "Part I / Part II" structure into a single, cohesive linear flow:
+The thesis has been refactored from a rigid "Part I / Part II" structure into a single, cohesive linear flow[cite: 2]:
 
-- **Abstract & Acknowledgements**
-- **1. Introduction**
-  - 1.1 Motivation & Problem Statement
-  - 1.2 Thesis Contributions
-  - 1.3 Organization
-- **2. Background & Technical Foundations**
-  - 2.1 The SCION Path-Aware Architecture
-  - 2.2 Quality of Experience & Transport Mechanisms (MPQUIC, ABR)
-  - 2.3 Deep RL Machinery (DQN, Dueling, SAC, Permutation Equivariance)
+- **Abstract & Acknowledgements**[cite: 1, 2]
+- **1. Introduction**[cite: 1, 2]
+  - 1.1 Motivation & Problem Statement[cite: 1, 2]
+  - 1.2 Thesis Contributions[cite: 1, 2]
+  - 1.3 Organization[cite: 1, 2]
+- **2. Background & Technical Foundations**[cite: 1, 2]
+  - 2.1 The SCION Path-Aware Architecture[cite: 1, 2]
+  - 2.2 Quality of Experience & Transport Mechanisms (MPQUIC, ABR)[cite: 1, 2]
+  - 2.3 Deep RL Machinery (DQN, Dueling, SAC, Permutation Equivariance)[cite: 1, 2]
   - 2.4 Goal-Conditioned Reinforcement Learning & FiLM Modulation
-- **3. Motivating Study: Intent-Conditioned Single-Path Selection**
-  - 3.1 Single-Path Selection Framework & State/Action Formulation
-  - 3.2 Intent Conditioning via Feature-Wise Linear Modulation (FiLM)
-  - 3.3 Implementation & SCION Simulation Environment
-  - 3.4 Experimental Evaluation & Intent Alignment
-  - 3.5 The Single-Path Performance Ceiling (Bridging to Chapter 4)
-- **4. Joint Application-Network Optimization over Multipath**
-  - 4.1 System Design: Co-Optimizing Rate and Traffic Splitting
-  - 4.2 Two-Timescale Hierarchical Agents (App Agent + Transport Agent)
-  - 4.3 Testbed & Backends (NS-3 Packet Simulator vs. Fast Mock Backend)
-  - 4.4 Experimental Evaluation & Regimes of Value (Volatility Analysis)
-- **5. Discussion & System Synthesis**
-  - 5.1 Synthesis of Findings (Modulative Ingestion & Volatility Drivers)
-  - 5.2 System Analysis (Overhead, Scalability, Generalization)
-  - 5.3 Deployment Considerations & Trust Assumptions
-- **6. Related Work**
-- **7. Conclusion & Future Work**
-- **Bibliography & Appendices**
+- **3. Problem Statement & Desired Properties**
+  - 3.1 Problem Formulation (Single-Path Discrete vs. Multipath Continuous)
+  - 3.2 Desired System Properties
+  - 3.3 Operating Assumptions & Scope
+- **4. Motivating Study: Intent-Conditioned Single-Path Selection**
+  - 4.1 Single-Path Selection Framework & State/Action Formulation
+  - 4.2 Intent Conditioning via Feature-Wise Linear Modulation (FiLM)
+  - 4.3 Implementation & SCION Simulation Environment
+  - 4.4 Experimental Evaluation & Intent Alignment
+  - 4.5 The Single-Path Performance Ceiling (Bridging to Chapter 5)
+- **5. Joint Application-Network Optimization over Multipath**
+  - 5.1 System Design: Co-Optimizing Rate and Traffic Splitting
+  - 5.2 Two-Timescale Hierarchical Agents (App Agent + Transport Agent)
+  - 5.3 Testbed & Backends (NS-3 Packet Simulator vs. Fast Mock Backend)
+  - 5.4 Experimental Evaluation & Regimes of Value (Volatility Analysis)
+- **6. Discussion & System Synthesis**[cite: 1, 2]
+  - 6.1 Synthesis of Findings (Modulative Ingestion & Volatility Drivers)
+  - 6.2 System Analysis (Overhead, Scalability, Generalization)
+  - 6.3 Deployment Considerations & Trust Assumptions
+- **7. Related Work**[cite: 1, 2]
+- **8. Conclusion & Future Work**[cite: 1, 2]
+- **Bibliography & Appendices**[cite: 1, 2]
 
 ---
 
 ## 3. Core Contributions & Key Technical Insights
 
-### Contribution 1: FiLM Modulation vs. Concatenation (Chapter 3)
+### Contribution 1: FiLM Modulation vs. Concatenation (Chapter 4)
 * **The Insight:** In comparison-based action selection (e.g., `argmax` over per-path $Q$-values), simply appending an intent vector $w$ to global state inputs fails. Additive, symmetric signals shift all path scores equally and cancel out during comparison.
 * **The Solution:** Feature-wise Linear Modulation (FiLM) applies affine transformations $\tilde{f}_i = (1+\gamma)\odot f_i + \beta$ to path-specific features. Multiplicative modulation changes the relative weight of path attributes (e.g., amplifying latency vs. goodput), allowing a single model to re-rank paths dynamically.
 
-### Contribution 2: Permutation-Equivariant Scoring Head (Chapters 3 & 4)
+### Contribution 2: Permutation-Equivariant Scoring Head (Chapters 4 & 5)
 * **The Insight:** Fixed-action heads (standard DQN) cannot handle dynamic source-destination pairs where path count $N$ changes over time.
 * **The Solution:** A shared scoring network evaluates each `(global_context, path_i)` pair independently. Masking invalid/absent paths ensures invariance to path ordering and scalability across variable topologies without retraining.
 
-### Contribution 3: Two-Timescale Hierarchical Co-Optimization (Chapter 4)
+### Contribution 3: Two-Timescale Hierarchical Co-Optimization (Chapter 5)
 * **The Architecture:**
   * **Application Agent (Slow, 1s cadence):** Horizon-agnostic SAC agent adapting target video bitrate ($300–6000\text{ kbit/s}$) to maximize overall QoE.
   * **Transport Agent (Fast, ~33ms frame cadence):** Continuous SAC agent outputting a continuous traffic split $(w_1, \dots, w_N)$ via softmax across active paths.
 * **The Coupling:** The transport agent observes the application's target bitrate. The application agent is rewarded for full QoE (VMAF, latency, jitter, loss), while the transport agent is rewarded for frame delivery efficiency.
 
-### Contribution 4: Regimes of Value / Volatility Finding (Chapter 4)
+### Contribution 4: Regimes of Value / Volatility Finding (Chapter 5)
 * **The Key Empirical Result:** In static, stable networks, learned multipath scheduling adds minimal value over a simple application-only rate adaptation.
 * **The Turning Point:** Under high network volatility, path churn, and bursty congestion, application-only control collapses. Joint rate and multipath traffic splitting is *decisive* for sustaining real-time media QoE.
 
@@ -85,26 +89,24 @@ The thesis has been refactored from a rigid "Part I / Part II" structure into a 
 
 ## 4. Evaluation Requirements & Benchmark Matrix
 
-When writing or reviewing Chapter 3 and Chapter 4 evaluations, the AI agent should ensure the following experiments and data points are highlighted:
+When writing or reviewing evaluation chapters, the AI agent should ensure the following experiments and data points are highlighted:
 
-### Chapter 3 (Motivating Study) Experiments
-1. **Ablation Table (Table 3.1):** Comparing `Flat DQN`, `Conditional-Concat`, and `Conditional-FiLM` across 5 reward profiles (`Balanced`, `Throughput`, `Latency`, `Trust`, `Low Probe`). Demonstrating near-zero behavioral shift in `Concat` vs. strong shift in `FiLM`.
-2. **Intent Alignment Matrix (Figure 3.1):** Heatmap showing $R(intent_{eval}, intent_{profile})$ with dominant diagonal entries.
-3. **Single-Path Performance Ceiling (Figure 3.3):** Goodput/QoE curve under increasing link utilization showing single-path degradation under congestion.
+### Single-Path Selection Experiments
+1. **Ablation Table (Table 4.1):** Comparing `Flat DQN`, `Conditional-Concat`, and `Conditional-FiLM` across 5 reward profiles (`Balanced`, `Throughput`, `Latency`, `Trust`, `Low Probe`). Demonstrating near-zero behavioral shift in `Concat` vs. strong shift in `FiLM`.
+2. **Intent Alignment Matrix (Figure 4.1):** Heatmap showing $R(intent_{eval}, intent_{profile})$ with dominant diagonal entries.
+3. **Single-Path Performance Ceiling (Figure 4.3):** Goodput/QoE curve under increasing link utilization showing single-path degradation under congestion.
 
-### Chapter 4 (Multipath Co-Optimization) Experiments
-1. **QoE Comparison Table (Table 4.1):** Mean QoE for `Learned Pair` vs. `App-Only`, `Single-Best Path`, `Proportional`, and `Even Split` across Static (4-path) and Dynamic (6-path) scenarios.
+### Multipath Co-Optimization Experiments
+1. **QoE Comparison Table (Table 5.1):** Mean QoE for `Learned Pair` vs. `App-Only`, `Single-Best Path`, `Proportional`, and `Even Split` across Static (4-path) and Dynamic (6-path) scenarios.
 2. **Dynamics Trace:** Within-episode timeseries proving the transport agent reallocates traffic away from churning/bursting paths.
 
 ---
 
-## 5. Writing Style & LaTeX Guidelines for AI Assistant
-
-For the content of each section of the thesis, adhere strictly to what is described in [WRITING_RULES.md](WRITING_RULES.md)
+## 5. Writing Style & Formatting Guidelines for AI Assistant
 
 When redacting or editing text for this thesis, adhere strictly to the following formatting and stylistic rules:
 
-1. **Tone:** Authentic, rigorous, scholarly, yet direct and readable. Tone should reflect a ETH Zurich Master's graduate in computer science.
+1. **Tone:** Authentic, rigorous, scholarly, yet direct and readable. Tone should reflect an ETH Zurich Master's graduate in computer science.
 2. **LaTeX Usage Rules:**
    * **Only** use LaTeX for formal math/science equations, variables, or set notations (e.g., $Q(s,a)$, $\pi(a|s,g)$, or display equations).
    * **Never** use LaTeX for standard text formatting, regular prose, simple numbers, or simple units (e.g., write **100 ms**, **30 fps**, **20%**, **300–6000 kbit/s** in plain text/Markdown bold).
