@@ -1,80 +1,53 @@
-\chapter{Problem Statement}
+\chapter{Problem Statement \& Desired Properties}
 \label{ch:problem}
 
-This chapter states the problem the thesis addresses, the properties a good solution must exhibit,
-the assumptions under which we operate, and the trust model that replaces the classical attacker
-model for this performance-oriented work.
+This chapter formalizes the network decision problems addressed in this thesis[cite: 1]. We define the system model, state the operational decision spaces across single-path and multipath regimes[cite: 1], enumerate the essential properties a satisfactory solution must exhibit[cite: 1], and outline our core operating assumptions and trust boundaries[cite: 1].
 
 \section{Problem Formulation}
 \label{sec:problem:formulation}
 
-Consider an end host that must carry an application's traffic toward a destination over a path-aware
-network. At any moment the host has access to a set of candidate paths $\mathcal{P} =
-\{p_1, \dots, p_N\}$, each described by measurable (and partly stale) properties -- latency, available
-bandwidth, loss, hop count, a trust score -- and the application expresses an \emph{intent} $g$: a
-statement of what it values, such as ``maximize goodput'' or ``minimize latency and jitter.'' The
-network's state evolves over time as cross-traffic, congestion, and topology change. The host must
-repeatedly decide how to serve the application:
+Consider an endpoint host communicating over a path-aware architecture such as SCION[cite: 1]. At any decision epoch $t$, the host discovers a dynamic set of $N_t$ candidate end-to-end paths $\mathcal{P}_t = \{p_1, \dots, p_{N_t}\}$[cite: 1]. Each path $p_i$ is characterized by partially observable and dynamic performance properties -- latency, loss rate, available bandwidth, hop count, and path trust[cite: 1]. Simultaneously, the running application expresses its \emph{intent} $g \in \mathcal{G}$, defined as a declarative preference vector prioritizing specific performance metrics (e.g., maximizing throughput, minimizing delay, or optimizing video quality)[cite: 1].
 
-\begin{itemize}
-  \item In \textbf{Part~I}, the decision is a \emph{single path} $p^\star \in \mathcal{P}$ to carry the
-  flow, chosen to maximize the application's intent-weighted objective while spending as little probing
-  effort as possible.
-  \item In \textbf{Part~II}, the decision is richer: a \emph{split} $(w_1, \dots, w_N)$ of the flow's
-  traffic across the paths \emph{and} the application's own \emph{sending rate} (video bitrate), chosen
-  jointly to maximize real-time video QoE.
-\end{itemize}
+Because network utilization and link availability fluctuate over time, the host must dynamically determine how best to utilize the path set $\mathcal{P}_t$ to serve intent $g$[cite: 1]. We formulate this decision across two progressive operational settings[cite: 1]:
 
-In both cases the underlying question is the one posed in \cref{ch:introduction}: \emph{choose the best
-use of the available paths given the application's intent and the network's state}. The technical crux
-is that neither the objective nor the action set is fixed -- the objective is dictated by an
-intent that can change from flow to flow, and the action set is a path collection that changes across
-pairs and over time.
+\begin{enumerate}
+  \item \textbf{Intent-Aware Single-Path Selection (Discrete Decision):} For general application flows constrained to a single path, the decision is a discrete selection $p^\star \in \mathcal{P}_t$[cite: 1]. The objective is to maximize an intent-weighted reward balancing goodput, latency, and trust while minimizing the active probing overhead required to inspect candidate path states (\cref{ch:single_path})[cite: 1].
+  
+  \item \textbf{Joint Application--Network Multipath Optimization (Continuous Decision):} For high-bandwidth, latency-sensitive applications (e.g., real-time WebRTC video) operating over Multipath QUIC, the decision space expands[cite: 1]. The endpoint must jointly choose a continuous traffic split $\boldsymbol{w} = (w_1, \dots, w_{N_t})$ across paths (where $\sum w_i = 1$) \emph{and} adapt the application's own sending rate (the video encoder's target bitrate $R_{\mathrm{video}}$) to maximize real-time Quality of Experience (QoE) (\cref{ch:multipath})[cite: 1].
+\end{enumerate}
+
+In both formulations, the technical crux is twofold: (i) the objective is dynamic and dictated by an intent $g$ that varies across flows[cite: 1], and (ii) the action space is dynamic and dynamic, as candidate path sets $\mathcal{P}_t$ fluctuate across network topologies and over time[cite: 1].
 
 \section{Desired Properties}
 \label{sec:problem:properties}
 
-A satisfactory solution should have the following properties, which also define the quality metrics
-used in the evaluation (\cref{ch:p1eval,ch:p2eval,ch:analysis}).
+A satisfactory solution must exhibit six key properties, which also define the primary metrics evaluated in subsequent chapters (\cref{ch:single_path,ch:multipath,ch:synthesis})[cite: 1]:
 
 \begin{description}
-  \item[Intent alignment.] The chosen action should maximize the objective the application actually
-  cares about. Concretely, a policy conditioned on intent $g$ should make decisions that score well
-  under $g$ -- and \emph{measurably differently} for different $g$. A policy that ignores its intent
-  input has failed this property even if its average reward looks reasonable.
-  \item[No per-objective retraining.] A single trained policy should serve the whole spectrum of
-  intents, including intents not seen at training time, rather than requiring a separately trained
-  model for each objective. This is what makes the approach deployable at Internet scale.
-  \item[Dynamic-action handling.] The policy must accept a variable and changing number of candidate
-  paths without retraining or architectural change, and remain invariant to the arbitrary ordering of
-  those paths.
-  \item[Low overhead.] Decisions should be cheap. In Part~I this means minimizing active probing of
-  paths (a first-class term in the reward); in both parts it means bounded per-decision inference cost
-  compatible with the control loop's timescale.
-  \item[Generalization.] Performance should hold across topologies, traffic conditions, and path counts
-  not seen during training, degrading gracefully rather than catastrophically off-distribution.
-  \item[Robustness to volatility.] Under non-stationary conditions -- congestion bursts, path churn,
-  regime shifts -- the policy should retain its advantage over static heuristics, which is precisely
-  where learned control is expected to pay off.
+  \item[Intent Alignment.] The policy must faithfully reflect the specified preference vector $g$[cite: 1]. Decisions under $g_{\mathrm{latency}}$ must prioritize low delay, whereas decisions under $g_{\mathrm{throughput}}$ must prioritize goodput[cite: 1]. A policy whose action choices remain invariant to changes in $g$ fails this requirement[cite: 1].
+  
+  \item[Zero-Shot Generalization Across Objectives.] A single trained network must serve the entire spectrum of application intents without requiring per-objective model retraining or fine-tuning[cite: 1].
+  
+  \item[Dynamic-Action Handling.] The policy architecture must natively accept dynamic candidate path counts $N_t$ without structural modification or retraining, remaining invariant to the arbitrary ordering of paths in $\mathcal{P}_t$[cite: 1].
+  
+  \item[Low Overhead.] Decision-making must remain computationally lightweight[cite: 1]. In single-path selection, active probing cost must be minimized[cite: 1]; in multipath real-time control, per-frame inference latency must fit comfortably within frame processing budgets ($\approx 33\,\mathrm{ms}$)[cite: 1].
+  
+  \item[Structural \& Topological Generalization.] Performance must hold off-distribution across unseen topologies, dynamic path counts, and shifting traffic workloads[cite: 1].
+  
+  \item[Robustness to Network Volatility.] The policy must sustain high performance under non-stationary conditions -- path churn, sudden link failures, and transient congestion bursts -- where static heuristics fail[cite: 1].
 \end{description}
 
-\section{Assumptions}
+\section{Assumptions \& Scope}
 \label{sec:problem:assumptions}
 
-We make the following assumptions explicit.
+We explicitly state the operating assumptions underlying our design[cite: 1]:
 
 \begin{enumerate}
-  \item \textbf{Path-aware substrate.} The host can enumerate multiple end-to-end paths to a
-  destination and direct traffic onto a chosen path or split, as SCION provides. We do not assume
-  control over intra-AS routing.
-  \item \textbf{Observable per-path metrics.} Per-path latency, loss, and a bandwidth estimate are
-  measurable, at a probing cost that the agent must economize (Part~I) or are available from transport
-  feedback such as acknowledgements and RTT samples (Part~II).
-  \item \textbf{Intent as a QoS preference.} Application intent is expressed as a compact vector -- a
-  set of reward weights over throughput, latency, jitter, loss, and trust (Part~I), or the fixed QoE
-  weighting of a real-time video call (Part~II). We do not attempt to \emph{infer} latent intent from
-  traffic; we assume the application (or a shim on its behalf) can declare it.
-  \item \textbf{Stationarity within a decision epoch.} Network conditions are assumed roughly stable
-  over the short interval of a single decision, though they may drift or shift abruptly between epochs;
-  the non-stationary regimes we study (\cref{ch:p2eval}) stress exactly this assumption.
+  \item \textbf{Path-Aware Substrate.} The underlying network exposes multiple distinct end-to-end paths to the endpoint and honors source routing decisions, as provided by SCION[cite: 1]. We do not assume control over internal intra-AS routing decisions[cite: 1].
+  
+  \item \textbf{Observable Path Feedback.} Per-path metrics (latency, loss, bandwidth) are measurable via active probing (in single-path selection) or derived continuously from transport feedback (e.g., QUIC ACK frames and RTT samples)[cite: 1].
+  
+  \item \textbf{Explicit Intent Declaration.} Application intent is declared as an explicit preference vector (e.g., reward profile weights or target QoE parameterizations)[cite: 1]. We do not attempt to infer latent intent from raw packet inspection[cite: 1].
+  
+  \item \textbf{Episodic Stationarity.} Network state is assumed roughly stationary within a brief decision epoch, though conditions may drift or shift abruptly between epochs[cite: 1].
 \end{enumerate}

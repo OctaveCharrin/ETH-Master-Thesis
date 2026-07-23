@@ -5,114 +5,74 @@ The Internet was designed to deliver packets, not experiences. A router forwards
 toward its destination without any notion of \emph{why} the datagram was sent: whether it
 carries a frame of an interactive video call that will be worthless if it arrives late, a
 byte of a background software update that only cares about aggregate throughput, or a
-control message whose loss would be catastrophic[cite: 1]. For decades this deliberate ignorance --
-the end-to-end principle -- was a feature[cite: 1]. Yet as applications have become more diverse and
+control message whose loss would be catastrophic. For decades this deliberate ignorance --
+the end-to-end principle -- was a feature. Yet as applications have become more diverse and
 more demanding, the mismatch between what the network optimizes and what the application
-actually values has grown into one of the central inefficiencies of modern networking[cite: 1].
+actually values has grown into one of the central inefficiencies of modern networking.
 
 Path-aware Internet architectures such as SCION~\cite{Perrig2017} change the terms of this
-problem[cite: 1]. In SCION, endpoints discover \emph{multiple} end-to-end paths to a destination and
-choose among them, rather than deferring blindly to whatever route BGP happens to install[cite: 1].
+problem. In SCION, endpoints discover \emph{multiple} end-to-end paths to a destination and
+choose among them, rather than deferring blindly to whatever route BGP happens to install.
 This turns path selection from a network-internal decision into an application-facing one:
-for the first time the entity that knows the application's intent -- the endpoint -- also
-holds the lever that determines how traffic is carried[cite: 1]. The question this thesis studies is
-the natural consequence of that shift:
+for the first time, the entity that knows the application's intent -- the endpoint -- also
+holds the lever that determines how traffic is carried. The fundamental question this thesis addresses is:
 
 \begin{quote}
 \itshape How should an endpoint choose the best path -- or the best \emph{combination} of
-paths -- given both the intention of the application and the current state of the network?[cite: 1]
+paths -- given both the intention of the application and the current state of the network?
 \end{quote}
 
-Answering this question is hard for three compounding reasons[cite: 1]. First, \emph{``best'' is not
-a fixed target}[cite: 1]. A path that is best for a bulk transfer (high goodput, tolerant of latency)
-is often a poor choice for a video call (which prizes low latency and jitter and will trade
-raw throughput to get them)[cite: 1]. Any single hand-tuned objective is therefore wrong for some
-application, and training a separate policy for every conceivable objective does not scale[cite: 1].
-Second, \emph{the decision space is dynamic and unbounded}[cite: 1]. The set of available paths between
-two hosts differs from pair to pair and changes over time as links appear, fail, congest, or
-recover; a policy that assumes a fixed, enumerated action set cannot cope[cite: 1]. Third, \emph{the
-state is only partially and expensively observable}[cite: 1]. Fresh per-path measurements cost probing
-overhead, so a good policy must decide well while measuring little[cite: 1].
+\section*{The Research Challenge}
+Answering this question is hard for three compounding reasons:
+\begin{enumerate}
+    \item \textbf{``Best'' is not a fixed target:} A path optimal for a bulk transfer (high goodput, tolerant of latency) is a poor choice for a video call (which prizes low latency and jitter). Hand-tuned objectives fail across diverse workloads, and training a separate reinforcement learning (RL) policy for every conceivable objective does not scale.
+    \item \textbf{The action space is dynamic and unbounded:} The set of candidate paths differs across source--destination pairs and fluctuates over time as links appear, fail, congest, or recover. Standard policies assuming a fixed, enumerated action set cannot cope.
+    \item \textbf{State is partially and expensively observable:} Fresh per-path measurements incur active probing overhead. A practical policy must decide well while measuring little.
+\end{enumerate}
 
-This thesis addresses these challenges through a unified principle inspired by recent work in
-congestion control[cite: 1]. The Mortise system~\cite{Shen2026} shows that network mechanisms can be
-steered to maximize an application's quality of experience (QoE) by treating the application's
-\emph{intent} as an explicit input that reshapes how the mechanism is tuned, rather than as a fixed
-constant baked into the algorithm[cite: 1]. We adopt this stance and push it across two sequential
-levels of operational control[cite: 1].
+\section*{Key Insights and Approach}
+This thesis addresses these challenges through a unified principle inspired by recent transport-layer auto-tuning. The Mortise system~\cite{Shen2026} shows that network mechanisms can be steered by treating application \emph{intent} as an explicit, dynamic input rather than a constant compiled into an algorithm. We transplant this principle across two sequential operational control layers:
 
-\paragraph{Motivating Foundation: Intent-Aware Single-Path Selection.} We first investigate
-how application intent can modulate discrete path choice for general network flows[cite: 1]. Building
-on the DQN-based SCION path selector of Bourak~et~al.~\cite{Bourak2025}, we introduce a
-permutation-equivariant \emph{path-scoring} architecture that supports dynamic, dynamic path sets[cite: 1].
-Crucially, we condition the agent on application intent using \emph{feature-wise linear modulation}
-(FiLM)~\cite{Perez2018}[cite: 1]. We demonstrate analytically and empirically that naive feature concatenation
-fails because additive signals cancel under \emph{argmax} selection, whereas FiLM modulation successfully
-re-ranks path features to serve diverse application profiles without retraining[cite: 1]. However, this study
-also exposes a fundamental boundary condition: when network congestion surges or link quality fluctuates,
-even the optimal single path reaches an architectural performance ceiling[cite: 1].
+\paragraph{1. Motivating Foundation: Intent-Aware Single-Path Selection.} We first investigate how application intent can modulate discrete path choice for general network flows. Building on the DQN path selector of Bourak~et~al.~\cite{Bourak2025}, we introduce a permutation-equivariant \emph{path-scoring} architecture that supports variable candidate path sets. Crucially, we condition the agent on application intent using \emph{feature-wise linear modulation} (FiLM)~\cite{Perez2018}. We unveil a key theoretical insight: \emph{naive feature concatenation fails in comparison-based selection because additive intent signals shift all candidate scores uniformly and cancel under argmax choice}. FiLM modulation solves this by multiplicatively scaling path features, enabling a single policy to adapt zero-shot across diverse application intents without retraining. However, this study also exposes a physical limitation: when congestion surges, even the optimal single path reaches an architectural performance ceiling.
 
-\paragraph{Joint Application--Network Optimization over Multipath.} Driven by the limitations of
-single-path selection, we expand our framework to co-optimize both the application and the network
-simultaneously[cite: 1]. Leveraging SCION's native path multiplicity and Multipath-QUIC~\cite{DeConinck2017}
-transport, we address interactive real-time video streaming by controlling both \emph{what} the
-application produces (the video encoder's target bitrate) and \emph{how} the network carries it
-(the continuous per-path traffic split)[cite: 1]. We design a two-timescale hierarchical reinforcement-learning
-system comprising a slow application agent for bitrate adaptation and a fast transport agent for path
-scheduling[cite: 1]. This closes the loop from high-level intent down to application generation[cite: 1].
-Our central finding is that the value of learned multipath scheduling depends sharply on network
-volatility -- nearly negligible when paths are stable, but decisive under path churn and congestion
-bursts, where adapting the application alone collapses[cite: 1].
+\paragraph{2. Joint Application--Network Optimization over Multipath.} Driven by the limitations of single-path selection, we expand our framework to co-optimize both the application and the network simultaneously. Leveraging SCION's native path multiplicity and Multipath-QUIC~\cite{DeConinck2017} transport, we address interactive real-time video streaming by controlling both \emph{what} the application produces (the video encoder's target bitrate) and \emph{how} the network carries it (the continuous per-path traffic split). We design a two-timescale hierarchical reinforcement-learning system comprising a slow application agent for bitrate adaptation and a fast transport agent for path scheduling. This closes the loop from high-level intent down to application generation. Here, we uncover a crucial operational insight: \emph{the value of learned multipath traffic splitting is a direct function of network volatility} -- it offers marginal gains in static networks, but becomes decisive under path churn and congestion bursts where application-only adaptation collapses.
 
-Throughout, a set of questions guides the reader: \emph{Can one policy serve many intents
-without retraining, and why does modulation succeed where concatenation fails?}[cite: 1] \emph{What are
-the exact boundaries where single-path selection falls short?} \emph{When is it worth splitting
-traffic across paths, and does co-optimizing the application with the network beat optimizing either alone?}[cite: 1]
-And \emph{how far are these techniques from practical deployment?}[cite: 1]
+\section*{Guiding Questions}
+Throughout this investigation, four central puzzles guide the reader:
+\begin{itemize}
+    \item \emph{Can a single RL policy realize a spectrum of application intents without retraining, and why does feature modulation succeed where state concatenation fails?}
+    \item \emph{Where are the exact operational boundaries where single-path selection falls short?}
+    \item \emph{When is it worth splitting traffic across multiple paths, and does joint application--network co-optimization strictly beat optimizing either layer in isolation?}
+    \item \emph{How do these learned controllers perform regarding probing overhead, real-time inference latency, and deployability?}
+\end{itemize}
 
 \section{Contributions}
 \label{sec:intro:contributions}
 
-This thesis makes the following contributions[cite: 1]:
+This thesis makes the following explicit, verifiable contributions:
 
 \begin{enumerate}
-  \item \textbf{An intent-conditioned single-path selection framework for SCION.} We extend the DQN path
-  selector of Bourak~et~al.~\cite{Bourak2025} with (i) a permutation-equivariant path-scoring network
-  supporting variable candidate path sets, and (ii) a FiLM-based conditioning mechanism that enables a
-  single policy to realize a spectrum of application intents without retraining (\cref{ch:single_path})[cite: 1].
+  \item \textbf{An intent-conditioned single-path selection framework for SCION:} We extend the DQN path selector of Bourak~et~al.~\cite{Bourak2025} with a permutation-equivariant path-scoring network and a FiLM conditioning mechanism, enabling a single policy to realize a spectrum of application intents zero-shot (\cref{ch:single_path}).
 
-  \item \textbf{Theoretical and empirical evidence for modulative intent conditioning.} We show why
-  naively concatenating an intent vector to the state fails in comparison-based selection, proving that
-  feature-wise modulation is required to re-order candidate actions (\cref{ch:single_path})[cite: 1].
+  \item \textbf{Theoretical and empirical proof of modulative intent conditioning:} We prove analytically and empirically that feature-wise modulation is required for comparison-based action selection, showing that state concatenation yields near-zero behavioral divergence across intents (\cref{ch:single_path}).
 
-  \item \textbf{Identification of the single-path performance ceiling.} We characterize the physical
-  and operational limits of intent-driven single-path selection under heavy link utilization, establishing
-  the empirical bridge to multipath co-optimization (\cref{ch:single_path})[cite: 1].
+  \item \textbf{Verifiable probing reduction at near-oracle quality:} We demonstrate that our learned single-path selector matches or exceeds top per-intent heuristics while achieving significant probing overhead reductions compared to exhaustive measurement (\cref{ch:single_path}).
 
-  \item \textbf{A hierarchical agent pair for joint application--network multipath co-optimization.}
-  We design and implement a two-timescale reinforcement-learning system that co-optimizes real-time video
-  bitrate (application) and per-path traffic splits (network) over Multipath~QUIC across both an NS-3
-  packet simulator and an analytical testbed (\cref{ch:multipath})[cite: 1].
+  \item \textbf{A hierarchical system for joint application--network co-optimization:} We design and implement a two-timescale hierarchical SAC framework for real-time video over Multipath QUIC, co-optimizing target bitrates and continuous path splits across NS-3 packet simulation and analytical testbeds (\cref{ch:multipath}).
 
-  \item \textbf{An evaluation of the regimes of value for learned network control.} We demonstrate that
-  learned multipath splitting yields diminishing returns in static environments but becomes decisive under
-  network volatility, path churn, and transient congestion bursts (\cref{ch:multipath,ch:analysis})[cite: 1].
+  \item \textbf{Characterization of the volatility driver for multipath control:} We demonstrate empirically that joint multipath control provides dramatic QoE improvements over application-only baselines specifically under high network volatility, path churn, and transient congestion bursts (\cref{ch:multipath,ch:analysis}).
 \end{enumerate}
 
 \section{Organization}
 \label{sec:intro:organization}
 
-The remainder of this thesis is organized as follows[cite: 1]:
+The remainder of this thesis is organized as follows:
 
-\Cref{ch:background} reviews the technical foundations, including the SCION architecture, goal-conditioned
-reinforcement learning, FiLM modulation, and real-time video transport over Multipath QUIC[cite: 1].
-\Cref{ch:problem} formalizes the decision problems, system models, desired properties, and trust assumptions[cite: 1].
+\Cref{ch:background} reviews technical foundations, including SCION, real-time video transport, deep RL machinery, and FiLM modulation.
+\Cref{ch:problem} formalizes the decision problems, system models, desired properties, and trust assumptions.
 
-\Cref{ch:single_path} presents our motivating study on intent-conditioned single-path selection, detailing
-its scoring architecture, FiLM conditioning, experimental evaluation, and performance limits[cite: 1].
-\Cref{ch:multipath} expands into joint application--network optimization over multipath, introducing the
-hierarchical two-timescale SAC design, the testbed implementation, and evaluation across volatile network regimes[cite: 1].
+\Cref{ch:single_path} presents our study on intent-conditioned single-path selection, detailing its scoring architecture, FiLM conditioning proof, and performance limits.
+\Cref{ch:multipath} expands into joint application--network optimization over multipath, detailing the two-timescale SAC architecture and evaluation across dynamic network regimes.
 
-\Cref{ch:synthesis} unifies the findings, analyzing overhead, scalability, generalization, and deployment gaps[cite: 1].
-\Cref{ch:related} situates our work within the broader research landscape[cite: 1], and \Cref{ch:conclusion}
-concludes with directions for future research[cite: 1].
+\Cref{ch:synthesis} unifies the findings, analyzing overhead, scalability, generalization, and deployment considerations (\cref{ch:analysis,ch:discussion}).
+\Cref{ch:related} places our work within the broader research landscape, and \Cref{ch:conclusion} concludes.

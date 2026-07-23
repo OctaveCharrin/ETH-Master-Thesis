@@ -100,6 +100,8 @@ When writing or reviewing Chapter 3 and Chapter 4 evaluations, the AI agent shou
 
 ## 5. Writing Style & LaTeX Guidelines for AI Assistant
 
+For the content of each section of the thesis, adhere strictly to what is described in [WRITING_RULES.md](WRITING_RULES.md)
+
 When redacting or editing text for this thesis, adhere strictly to the following formatting and stylistic rules:
 
 1. **Tone:** Authentic, rigorous, scholarly, yet direct and readable. Tone should reflect a ETH Zurich Master's graduate in computer science.
