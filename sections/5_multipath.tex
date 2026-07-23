@@ -1,0 +1,325 @@
+\chapter{Joint Application--Network Optimization over Multipath}
+\label{ch:multipath}
+
+\Cref{ch:single_path} chose a single path for a flow and found its ceiling: when the shared bottleneck
+saturates, even the best single path cannot carry the demand. This chapter starts from a more ambitious
+premise. SCION offers not one path but several, so why commit to one? And if Mortise~\cite{Shen2026} can
+tune a \emph{transport mechanism} to the application, why not tune the \emph{application itself} in the
+same breath? We design and evaluate a system that (i) uses multiple paths at once via Multipath
+QUIC~\cite{DeConinck2017} and (ii) jointly optimizes what the application sends -- the video encoder's
+target bitrate -- and how the network spreads it -- the per-path traffic split -- to maximize the quality
+of experience of a real-time video call. \Cref{sec:mp:design} presents the design, \cref{sec:mp:impl} the
+testbed, and \cref{sec:mp:eval} the evaluation, whose central finding is that the value of learned
+multipath scheduling is a direct function of network volatility.
+
+\section{System Design: Co-Optimizing Rate and Traffic Split}
+\label{sec:mp:design}
+
+\Cref{sec:p2design:motivation} motivates the joint, multipath framing and the strawmen it improves on.
+\Cref{sec:p2design:hierarchy} presents the two-timescale hierarchical agent pair.
+\Cref{sec:p2design:mdp} specifies the observations, actions, and rewards.
+\Cref{sec:p2design:coupling} explains the coupling that keeps the two agents cooperating rather than
+working at cross purposes. \Cref{sec:p2design:scoring} extends the scoring idea of \cref{ch:single_path}
+from a discrete choice to a continuous split over a variable, possibly changing, path set.
+
+\subsection{Motivation and Strawmen}
+\label{sec:p2design:motivation}
+
+Interactive video is a demanding, ubiquitous workload with no playback buffer to hide variance: a frame
+that misses its deadline is simply lost. Its QoE depends on two decisions that are usually made in
+isolation. The \emph{application} chooses an encoding bitrate -- too high and the network drops frames,
+too low and quality suffers. The \emph{network} chooses how to carry the resulting bytes -- over one path
+or spread across several. Optimizing either alone is a strawman:
+
+\begin{description}
+  \item[Application-only.] Adapt bitrate to the aggregate network but carry it over a fixed or naive
+  path assignment. This wastes SCION's path diversity and, as our results show, collapses when the paths
+  it depends on degrade.
+  \item[Network-only.] Schedule cleverly across paths but treat the offered load as exogenous. The
+  scheduler cannot relieve congestion it is itself creating by admitting too high a bitrate.
+\end{description}
+
+The two decisions are coupled through the same bottleneck: bitrate sets the load the scheduler must
+place, and the scheduler's success sets the effective capacity the bitrate controller sees. Optimizing
+them jointly is the design's premise. The challenge is that they naturally operate on \emph{different
+timescales} -- an encoder should not change bitrate every frame, but a scheduler must react per frame --
+which motivates a hierarchy rather than a single monolithic agent.
+
+\subsection{Two-Timescale Hierarchical Agents}
+\label{sec:p2design:hierarchy}
+
+We split control into two cooperating agents that act at different cadences, a ``brain and body''
+decomposition.
+
+\begin{description}
+  \item[Application agent (slow).] Every \SI{1}{\second} (once per 30 frames at 30\,fps) it observes
+  an aggregate summary of the connection and outputs a single target encoder bitrate in the range
+  \SIrange{300}{6000}{\kilo\bit\per\second}. It is deliberately \emph{horizon-agnostic} -- it never
+  observes how far along the call is -- so the same policy applies to a call of any length, an essential
+  property for a controller meant to run in unbounded real sessions.
+  \item[Transport agent (fast).] Every frame (${\approx}\SI{33}{\milli\second}$) it observes per-path
+  transport state \emph{and the application agent's current target bitrate}, and outputs a split of that
+  frame's bytes across the available paths.
+\end{description}
+
+Both are trained with soft actor-critic (\cref{sec:background:rl}), whose continuous action support and
+sample efficiency suit these controls and the cost of simulator rollouts.
+
+\subsection{Observations, Actions, and Rewards}
+\label{sec:p2design:mdp}
+
+\paragraph{Application observation and action.} The application agent sees a small fixed-size vector:
+normalized current bitrate, smoothed RTT, jitter, loss, and throughput. Its action is one continuous
+scalar in $[-1,1]$, mapped affinely to a target bitrate in \SIrange{300}{6000}{\kilo\bit\per\second}.
+
+\paragraph{Transport observation and action.} The transport agent sees a global block (target bitrate,
+RTT, loss, throughput) and, for each path, a feature vector (congestion window, smoothed RTT, buffer
+occupancy, per-path throughput, per-path loss). Its action is an $N$-vector passed through a softmax to
+yield a split $(w_1,\dots,w_N)$ that is non-negative and sums to one -- a valid allocation by
+construction.
+
+\paragraph{Rewards.} The rewards encode the QoE objective and the division of responsibility between the
+agents. The application's per-window QoE reward composes a quality term with penalties:
+\begin{equation}
+\mathrm{QoE} = a\cdot\frac{\mathrm{VMAF}(\cdot)}{100}
+             - b\cdot\widetilde{\mathrm{lat}}
+             - c\cdot\widetilde{\mathrm{jit}}
+             - d\cdot\mathrm{loss},
+\qquad \text{clipped to } [-2, 1],
+\label{eq:p2qoe}
+\end{equation}
+where $\widetilde{\mathrm{lat}}$ and $\widetilde{\mathrm{jit}}$ are latency and jitter normalized (by
+\SI{200}{\milli\second} and \SI{50}{\milli\second}) and clipped, and the default weights are
+$(a,b,c,d) = (1, 0.5, 0.5, 1)$. The quality term uses a VMAF surrogate (\cref{sec:mp:impl}); when a
+learned surrogate that already accounts for loss is used, the explicit loss penalty is dropped to avoid
+double-counting. The transport agent receives a per-frame reward that credits delivery without quality,
+since it does not control bitrate:
+\begin{equation}
+R_{\text{transport}} = (1 - \mathrm{loss}) - b\cdot\widetilde{\mathrm{lat}} - c\cdot\widetilde{\mathrm{jit}},
+\qquad \text{clipped to } [-2, 1].
+\label{eq:p2transport}
+\end{equation}
+
+\subsection{Coupling the Two Agents}
+\label{sec:p2design:coupling}
+
+The design's subtlety is keeping the agents cooperative. Two mechanisms couple them.
+
+\paragraph{Observation coupling.} The transport agent observes the application's current target bitrate.
+It therefore schedules \emph{knowing} how much load it must place, and can, for instance, spread an
+aggressive bitrate across more paths rather than overrunning one. This is what makes the pair hierarchical
+rather than two agents optimizing in ignorance of each other.
+
+\paragraph{Reward decomposition.} The application owns quality (the VMAF term) and is credited for the
+latency, jitter, and loss experienced over the window its bitrate governed; the transport agent is
+credited only for how well it delivered each frame. This assigns each decision the consequences it can
+actually control -- the encoder is not blamed for a poor split, nor the scheduler for an over-ambitious
+bitrate -- while the shared bottleneck still couples them: a bad split shows up as latency/loss in the
+application's reward, and an over-high bitrate shows up as loss the transport agent cannot schedule away.
+
+\subsection{Continuous Scoring over a Variable Path Set}
+\label{sec:p2design:scoring}
+
+The transport agent inherits the single-path selector's problem -- a variable, possibly changing number
+of paths -- and its solution, adapted from a discrete choice to a continuous allocation. A shared per-path
+encoder maps each $(\text{global}, \text{path}_i)$ pair to a logit; the logits are softmaxed into the
+split, so the policy is permutation-equivariant and independent of the path count. To handle paths that
+appear and disappear, each path carries a \emph{liveness} flag and the state includes a binary mask; the
+softmax excludes dead paths, so traffic is never allocated to a path that is gone. The critic aggregates
+per-path embeddings with a masked mean-pool -- a Deep Sets~\cite{Zaheer2017} operation -- yielding a value
+estimate invariant to path ordering and count. This continuous scoring agent is the natural sibling of the
+discrete scoring selector of \cref{ch:single_path}: the same architectural idea, once for ``pick a path''
+and once for ``divide across paths.''
+
+\section{Implementation: Multipath Real-Time Video Testbed}
+\label{sec:mp:impl}
+
+Realizing the design requires a testbed that is faithful enough to expose real multipath and
+congestion behavior yet fast enough for reinforcement-learning rollouts. We resolve this tension with a
+single data-plane abstraction served by two interchangeable backends (\cref{sec:p2impl:dataplane}): a
+packet-level NS-3 simulator and a fast analytical mock. \Cref{sec:p2impl:rt} describes the real-time
+video and multipath model, \cref{sec:p2impl:agents} the agent implementation and the VMAF surrogate, and
+\cref{sec:p2impl:gaps} the known gaps that scope the current results.
+
+\subsection{Data-Plane Abstraction and Two Backends}
+\label{sec:p2impl:dataplane}
+
+Both backends implement one abstract \texttt{DataPlane} interface, so the RL code, observations, and
+rewards are written once and run unchanged against either. This lets us iterate quickly on the mock and
+validate on the higher-fidelity simulator without divergence.
+
+\begin{description}
+  \item[NS-3 backend.] A packet-level simulation in which the connection's several paths are modeled as
+  independent subflows over a topology of links, each with its own capacity, propagation delay, and
+  active-queue management (FqCoDel). Realistic contention comes from OnOff UDP cross-traffic with
+  exponentially distributed on/off periods, phase-shifted per path so the paths do not degrade in
+  lockstep. Each video frame's bytes are striped across the subflows according to the transport agent's
+  split, and delivery is tracked by a byte-watermark scheme -- avoiding per-packet tagging -- from which
+  per-frame latency, jitter, and deadline-miss loss are measured. Python and NS-3 communicate through an
+  ns3-ai shared-memory bridge.
+  \item[Mock backend.] A pure-Python, per-seed-deterministic model in which each path has a capacity
+  envelope (a smooth sinusoidal component plus bursty cross-traffic and noise) and a standing-queue model
+  that produces bufferbloat when a path is overdriven. It runs orders of magnitude faster than NS-3 and is
+  used for rapid training and for scenarios the NS-3 body does not yet emit.
+\end{description}
+
+\paragraph{Non-stationary dynamics.} The mock backend can optionally inject the volatility that makes
+multipath scheduling matter: \emph{path churn} (paths appear and disappear, and bytes sent to a dead path
+are lost), \emph{regime shifts} (abrupt changes in the best path's capacity), \emph{congestion bursts}
+(transient per-path capacity collapses), and \emph{correlated failures} (shared-bottleneck groups that
+degrade together). These are off by default and are the conditions under which \cref{sec:mp:eval} finds the
+learned split decisive.
+
+\subsection{Real-Time Video and Multipath Model}
+\label{sec:p2impl:rt}
+
+The video source mirrors a conferencing encoder: a fixed frame rate (30\,fps by default), variable
+frame sizes (with periodic larger I-frames and per-frame jitter), no playback buffer, and a deadline
+after which a late frame is discarded as lost. The aggregate target bitrate ranges over
+\SIrange{300}{6000}{\kilo\bit\per\second}. The canonical topology is deliberately \emph{non-dominant}: no
+single path can carry full-quality video, and the aggregate usable capacity sits below the quality knee,
+so the system must genuinely combine paths and trade rate against delivery. For example, a four-path
+configuration mixes paths of differing capacity and RTT -- including a higher-capacity but high-latency
+``trap'' path -- under heavy, path-specific cross-traffic, so that neither the widest nor the
+lowest-latency path is right on its own.
+
+\subsection{Agents and QoE Surrogate}
+\label{sec:p2impl:agents}
+
+\paragraph{Agents.} Both agents are soft actor-critic learners with twin critics and automatic
+temperature tuning. The transport agent has two variants: a \emph{flat} version whose actor and critic
+consume a fixed-length concatenation of the global and per-path features (a fixed path count), and a
+\emph{scoring} version implementing the permutation-equivariant, mask-aware design of
+\cref{sec:p2design:scoring} with a shared per-path actor and a Deep Sets masked-mean-pool critic. The
+hierarchical training loop runs the two agents at their respective cadences, storing each agent's
+transitions in its own replay buffer and crediting the application agent over the window of frames its
+bitrate governed.
+
+\paragraph{VMAF surrogate.} The quality term of \cref{eq:p2qoe} needs a mapping from an encoding (and
+network conditions) to perceptual quality. Two are supported: a default bitrate-only logarithmic curve fit
+through published quality anchors, and a learned surrogate that interpolates a
+quality-of-service$\rightarrow$VMAF table over bitrate, loss, delay, and jitter (produced by a sibling
+data-generation project). When the learned surrogate is active, the explicit loss penalty in
+\cref{eq:p2qoe} is dropped to avoid double-counting the loss it already reflects.
+
+\subsection{Known Gaps}
+\label{sec:p2impl:gaps}
+
+The current testbed has three limitations that scope the results of \cref{sec:mp:eval} and define concrete
+follow-up work.
+
+\begin{itemize}
+  \item \textbf{Dynamics parity.} The non-stationary dynamics (churn, regime shifts, bursts) are
+  currently emitted only by the mock backend; porting them into the NS-3 body -- adding per-path liveness
+  to the simulation -- is required before the packet-level and analytical results can be compared on equal
+  footing. \gap{report NS-3 vs.\ mock parity once the C++ dynamics land.}
+  \item \textbf{Transport realism.} Subflows are modeled with TCP-like congestion control rather than true
+  Multipath QUIC; this preserves congestion, queueing, and loss dynamics but masks some network loss as
+  latency. Swapping in a real QUIC module is future work.
+  \item \textbf{Surrogate coverage.} The learned VMAF surrogate's loss, delay, and jitter axes are
+  currently under-sampled, so the quality term is effectively bitrate-dominated; a richer surrogate would
+  activate those axes and let quality respond to delivery conditions directly.
+\end{itemize}
+
+\section{Experimental Evaluation: Regimes of Value}
+\label{sec:mp:eval}
+
+This section evaluates the multipath system. \Cref{sec:p2eval:setup} gives the setup and baselines;
+\cref{sec:p2eval:results} reports the central finding -- that the value of learned multipath scheduling
+depends sharply on how volatile the network is; and \cref{sec:p2eval:ablation} isolates the contributions
+of the joint design and the scoring transport agent. The numbers reported here are from preliminary runs
+on the mock backend; packet-level NS-3 confirmation is pending (\cref{sec:p2impl:gaps}) and is marked
+where relevant.
+
+\subsection{Setup and Baselines}
+\label{sec:p2eval:setup}
+
+\paragraph{Scenarios.} We use two contrasting scenarios. The \emph{static} scenario is the non-dominant
+four-path topology of \cref{sec:p2impl:rt}, with stationary (if heavily loaded) paths. The \emph{dynamic}
+scenario is a six-path setting with the non-stationary dynamics of \cref{sec:p2impl:dataplane} enabled --
+path churn, regime shifts, and congestion bursts -- so that the identity and quality of the best paths
+change during a call.
+
+\paragraph{Metric.} The primary metric is mean per-window QoE (\cref{eq:p2qoe}); we also report the
+underlying achieved bitrate, latency, loss, and VMAF.
+
+\paragraph{Baselines.} The learned pair (application agent + transport agent) is compared against fixed
+scheduling policies driving the \emph{same} learned bitrate controller where applicable: \emph{even}
+split across live paths, \emph{single} best-active path, and \emph{proportional} allocation by capacity.
+The decisive ablation is \emph{app-only}: the learned bitrate controller with a naive even split,
+isolating the value of the learned transport agent.
+
+\subsection{Results: When Does Splitting Help?}
+\label{sec:p2eval:results}
+
+The headline result is that the learned split's value is conditional on volatility.
+\Cref{tab:p2results} summarizes preliminary QoE across scenarios and methods.
+
+\begin{table}[t]
+  \centering
+  \caption{Preliminary mean QoE (\cref{eq:p2qoe}) by scenario and method (mock backend). Higher is
+  better. In the static scenario the split barely matters -- the learned transport agent adds little over
+  app-only -- whereas in the dynamic scenario the split is decisive and app-only collapses.}
+  \label{tab:p2results}
+  \begin{tabular}{lcc}
+    \toprule
+    Method & Static 4-path & Dynamic 6-path \\
+    \midrule
+    Learned pair (app + transport) & \textbf{0.633} & \textbf{0.606} \\
+    App-only (learned rate, even split) & 0.665 & $-0.212$ \\
+    Single best-active path & 0.514 & 0.402 \\
+    Proportional (by capacity) & \gap{fill} & 0.209 \\
+    Even split & \gap{fill} & 0.109 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Two observations stand out. First, in the \textbf{static} scenario the learned pair (0.633) beats the
+single-best-path baseline (0.514) by roughly 23\%, but the app-only ablation (0.665) is actually on par
+with -- even marginally above -- the full system. When paths are stable, a good bitrate controller over a
+simple split captures nearly all the achievable QoE, and the transport agent has little left to earn. A
+practitioner reading only the static numbers might reasonably conclude that learned scheduling is not
+worth its complexity.
+
+Second, the \textbf{dynamic} scenario overturns that conclusion. The learned pair (0.606) again leads,
+but now the app-only ablation \emph{collapses to $-0.212$}: with paths churning and bursting, a fixed even
+split routes traffic onto dead or congested paths, driving latency and loss up despite a well-chosen
+bitrate. The fixed-schedule baselines degrade in order of how much they react to path state -- single-best
+(0.402), proportional (0.209), even (0.109) -- and only the learned transport agent, which observes path
+liveness and reallocates, sustains high QoE. This is the condition under which learned multipath
+scheduling is not a marginal optimization but the difference between a usable and an unusable call.
+
+\gap{add variance/confidence intervals over seeds, and a time series from a representative dynamic
+episode showing the transport agent reallocating away from a path as it churns or bursts (the
+\texttt{dyn-scoring} run illustrates convergence from strongly negative early-episode reward to stable
+positive QoE with latency in the tens of milliseconds and loss a few percent).}
+
+\placeholderfig{Figure: QoE over training episodes for the learned pair vs.\ baselines in the dynamic
+scenario, and a within-episode trace of the per-path split tracking path liveness.}
+
+\subsection{Ablation Study}
+\label{sec:p2eval:ablation}
+
+\paragraph{Joint vs.\ app-only.} \Cref{tab:p2results} already provides the core ablation: removing the
+learned transport agent (app-only) is nearly free when the network is stable but catastrophic when it is
+volatile. This quantifies the design premise of \cref{sec:p2design:motivation} -- the two decisions must
+be co-optimized precisely in the regimes where the network is hard.
+
+\paragraph{Flat vs.\ scoring transport.} We compare the flat transport agent (fixed path count) against
+the permutation-equivariant scoring agent (\cref{sec:p2design:scoring}) on the dynamic scenario, where the
+number of live paths changes.
+\gap{report the flat-vs-scoring comparison; the expected finding is that only the scoring/mask-aware agent
+handles a changing path count gracefully, since the flat agent cannot represent appearing/disappearing
+paths.}
+
+\paragraph{Backend parity.} All numbers above are from the mock backend. Confirming them on the
+packet-level NS-3 backend requires the dynamics port of \cref{sec:p2impl:gaps}.
+\gap{report NS-3 results for the static scenario now, and for the dynamic scenario once the C++ dynamics
+land, to establish that the mock findings transfer to packet-level simulation.}
+
+\subsection{Summary}
+\label{sec:p2eval:summary}
+Preliminary results support the joint, multipath design: co-optimizing bitrate and per-path split matches
+or beats every fixed-scheduling baseline, and the advantage of learned scheduling grows from negligible
+in a stable network to decisive under churn and bursts. The main open items are seed-level statistics,
+the flat-vs-scoring comparison, and NS-3 confirmation.

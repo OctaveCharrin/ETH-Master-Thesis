@@ -4,7 +4,7 @@
 This appendix collects the hyperparameters, reward-profile definitions, and supplementary results that
 support the main text. Values still to be finalized from the experiment runs are marked.
 
-\section{Part~I: Reward Profiles}
+\section{Single-Path Selection: Reward Profiles}
 \label{app:p1profiles}
 
 The conditional path-selection agent is trained and evaluated across the reward-weight vectors
@@ -13,7 +13,7 @@ intents. \Cref{tab:app:profiles} lists representative profiles.
 
 \begin{table}[h]
   \centering
-  \caption{Representative reward profiles (application intents) used in Part~I. $w_1$ weights goodput,
+  \caption{Representative reward profiles (application intents) used in the single-path selection study (\cref{ch:single_path}). $w_1$ weights goodput,
   $w_2$ trust, $w_3$ loss and $w_4$ delay within the trust term, and $w_{\text{probe}}$ the probing
   penalty.}
   \label{tab:app:profiles}
@@ -31,13 +31,13 @@ intents. \Cref{tab:app:profiles} lists representative profiles.
   \end{tabular}
 \end{table}
 
-\section{Part~I: Agent Hyperparameters}
+\section{Single-Path Selection: Agent Hyperparameters}
 \label{app:p1hyper}
 \gap{tabulate the final hyperparameters (hidden sizes, learning rate, discount $\gamma$, target-update
 rate, batch size, replay capacity, PER $\alpha$/$\beta$ schedule, number of training episodes) for the
 flat, scoring, and conditional agents.}
 
-\section{Part~II: QoE Weights and SAC Hyperparameters}
+\section{Multipath System: QoE Weights and SAC Hyperparameters}
 \label{app:p2hyper}
 
 The QoE reward of \cref{eq:p2qoe} uses default weights $(a,b,c,d) = (1, 0.5, 0.5, 1)$ with latency and
@@ -50,5 +50,5 @@ RTT, cross-traffic intensity) for the static four-path and dynamic six-path scen
 
 \section{Supplementary Results}
 \label{app:extra}
-\gap{additional plots: per-episode training curves, per-intent path-choice distributions (Part~I), and
-representative within-episode split traces (Part~II).}
+\gap{additional plots: per-episode training curves, per-intent path-choice distributions (single-path), and
+representative within-episode split traces (multipath).}

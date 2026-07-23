@@ -30,15 +30,15 @@ Rather than splitting the work into disconnected parts, the thesis follows a **u
 
 The thesis has been refactored from a rigid "Part I / Part II" structure into a single, cohesive linear flow[cite: 2]:
 
-- **Abstract & Acknowledgements**[cite: 1, 2]
-- **1. Introduction**[cite: 1, 2]
-  - 1.1 Motivation & Problem Statement[cite: 1, 2]
-  - 1.2 Thesis Contributions[cite: 1, 2]
-  - 1.3 Organization[cite: 1, 2]
-- **2. Background & Technical Foundations**[cite: 1, 2]
-  - 2.1 The SCION Path-Aware Architecture[cite: 1, 2]
-  - 2.2 Quality of Experience & Transport Mechanisms (MPQUIC, ABR)[cite: 1, 2]
-  - 2.3 Deep RL Machinery (DQN, Dueling, SAC, Permutation Equivariance)[cite: 1, 2]
+- **Abstract & Acknowledgements**
+- **1. Introduction**
+  - 1.1 Motivation & Problem Statement
+  - 1.2 Thesis Contributions
+  - 1.3 Organization
+- **2. Background & Technical Foundations**
+  - 2.1 The SCION Path-Aware Architecture
+  - 2.2 Quality of Experience & Transport Mechanisms (MPQUIC, ABR)
+  - 2.3 Deep RL Machinery (DQN, Dueling, SAC, Permutation Equivariance)
   - 2.4 Goal-Conditioned Reinforcement Learning & FiLM Modulation
 - **3. Problem Statement & Desired Properties**
   - 3.1 Problem Formulation (Single-Path Discrete vs. Multipath Continuous)
@@ -55,13 +55,13 @@ The thesis has been refactored from a rigid "Part I / Part II" structure into a 
   - 5.2 Two-Timescale Hierarchical Agents (App Agent + Transport Agent)
   - 5.3 Testbed & Backends (NS-3 Packet Simulator vs. Fast Mock Backend)
   - 5.4 Experimental Evaluation & Regimes of Value (Volatility Analysis)
-- **6. Discussion & System Synthesis**[cite: 1, 2]
+- **6. Discussion & System Synthesis**
   - 6.1 Synthesis of Findings (Modulative Ingestion & Volatility Drivers)
   - 6.2 System Analysis (Overhead, Scalability, Generalization)
   - 6.3 Deployment Considerations & Trust Assumptions
-- **7. Related Work**[cite: 1, 2]
-- **8. Conclusion & Future Work**[cite: 1, 2]
-- **Bibliography & Appendices**[cite: 1, 2]
+- **7. Related Work**
+- **8. Conclusion & Future Work**
+- **Bibliography & Appendices**
 
 ---
 

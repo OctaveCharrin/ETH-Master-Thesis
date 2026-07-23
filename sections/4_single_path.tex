@@ -1,0 +1,471 @@
+\chapter{Motivating Study: Intent-Conditioned Single-Path Selection}
+\label{ch:single_path}
+
+This chapter investigates the first and most basic control decision a SCION endpoint faces: given a
+running application's intent and a changing network, \emph{which} of the candidate paths to a destination
+should carry a flow? We answer it in five steps. \Cref{sec:sp:framework} builds the selection framework --
+the simulation environment, the decision problem, and a permutation-equivariant scoring architecture that
+copes with a variable path set. \Cref{sec:p1design:film} adds the chapter's central contribution, FiLM-based
+intent conditioning, and argues why modulation is required where naive concatenation fails.
+\Cref{sec:sp:impl} describes the implementation and the baselines. \Cref{sec:sp:eval} evaluates the
+conditioned selector on held-out pairs, hours, and intents. Finally, \cref{sec:p1eval:ceiling} identifies
+the single-path performance ceiling that motivates the multipath system of \cref{ch:multipath}.
+
+\section{Selection Framework: Environment, Decision, and Scoring}
+\label{sec:sp:framework}
+
+We start from the DQN path selector of Bourak~et~al.~\cite{Bourak2025} and identify three limitations we
+set out to remove (\cref{sec:p1design:strawman}). We then describe the improved simulation environment
+(\cref{sec:p1design:env}), the state, action, and reward that define the decision problem
+(\cref{sec:p1design:mdp}), and the permutation-equivariant path-scoring architecture that handles a
+variable path set (\cref{sec:p1design:scoring}).
+
+\subsection{Starting Point and Its Limitations}
+\label{sec:p1design:strawman}
+
+Bourak~et~al.~\cite{Bourak2025} frame SCION path selection as a reinforcement-learning problem and
+train a DQN to pick a path from per-path measurements of latency, loss, and bandwidth, rewarding a
+weighted combination of goodput and trust while charging for probing. They report oracle-level
+selection quality at a fraction of the probing cost of measuring every path. This validates the RL
+framing and gives us a reward structure to build on, but three design choices limit it.
+
+\begin{description}
+  \item[Fixed action space.] A vanilla DQN has one output per action, so the number of paths must be
+  fixed and known. Real source--destination pairs have different, time-varying path counts; padding to
+  a maximum wastes capacity and still caps the topology size.
+  \item[Single baked-in objective.] The reward weights are constants chosen before training. The
+  resulting policy embodies \emph{one} trade-off between goodput and trust; a different application
+  intent demands a different, separately trained model.
+  \item[Environment fidelity.] Capturing when path selection actually matters requires paths that
+  genuinely share bottlenecks and conditions that vary over realistic timescales, so that a good choice
+  at one hour is a poor choice at another.
+\end{description}
+
+Our design removes all three: a scoring architecture for the first, FiLM conditioning for the second,
+and an improved environment for the third. A strawman for the second limitation -- simply appending the
+reward weights to the state of the existing DQN -- is instructive precisely because it \emph{fails}, as
+we show in \cref{sec:p1design:film}; that failure motivates the modulation-based design.
+
+\subsection{Improved SCION Simulation Environment}
+\label{sec:p1design:env}
+
+Training and evaluating a path selector requires an environment in which the ``right'' path changes
+with conditions. We construct one in several stages.
+
+\paragraph{Topology.} AS-level topologies are generated with BRITE and converted into SCION structures
+-- ISDs, core and non-core ASes, and inter/intra-ISD links -- so that the graph has realistic degree
+and locality structure rather than being hand-drawn.
+
+\paragraph{Control plane.} A beaconing simulation propagates path-segment construction beacons
+top-down within each ISD and across the core mesh between ISDs, yielding the up/core/down segments that
+compose into end-to-end paths. Peer links are excluded. The result is, for each source--destination
+pair, a realistic set of candidate paths of varying length and quality -- the agent's action set.
+
+\paragraph{Traffic and link dynamics.} We drive the network with 28~days of hourly demand: foreground
+flows for every routable pair plus randomized background traffic, modulated by diurnal and weekly
+factors. Crucially, load is aggregated \emph{per link}, so paths that share a bottleneck link contend
+for its capacity. This is what makes selection non-trivial: the utilization and effective bandwidth of
+a path depend on what every other flow is doing at that hour, and the best path at 3\,a.m. is often
+congested at 8\,p.m.
+
+\paragraph{Probing model.} Fresh metrics are not free. The environment charges a latency probe a small
+per-hop cost and a full bandwidth probe a substantially larger one, and it credits the agent with
+having probed only the path(s) it actually inspects. This turns ``measure less'' into a real objective
+rather than an afterthought, and lets us compare the learned selector's probing footprint against
+baselines that probe exhaustively.
+
+\subsection{Decision Problem: State, Action, Reward}
+\label{sec:p1design:mdp}
+
+\paragraph{State.} The agent observes a \emph{global} context and a \emph{per-path} feature matrix. The
+global context summarizes time and aggregate conditions -- normalized day-of-week and hour-of-day, mean
+path utilization, mean trust, and the fraction of paths that are congested -- plus a compact encoding of
+the source and destination. Each candidate path contributes a feature row: normalized latency, loss
+rate, hop count, a bandwidth ratio, utilization, a static-bandwidth term, and a trust score. Because the
+number of rows $N$ varies, the state is naturally a (global, path-matrix) pair rather than a flat
+vector.
+
+\paragraph{Action.} The action is the choice of one path, i.e.\ an index into the current candidate set.
+Because $N$ varies, the action is realized as an $\arg\max$ over per-path scores (\cref{sec:p1design:scoring})
+with invalid entries masked, rather than as a fixed categorical head.
+
+\paragraph{Reward.} We adopt and generalize the goodput--trust reward of
+Bourak~et~al.~\cite{Bourak2025}. For the chosen path, let $\mathrm{goodput}\in[0,1]$ be the achieved
+bandwidth normalized by an auto-detected per-topology capacity, and define a trust term from loss and
+delay,
+\begin{equation}
+\mathrm{trust} = \max\!\big(0,\; 1 - (w_3\,\mathrm{loss} + w_4\,\mathrm{delay})\big),
+\label{eq:p1trust}
+\end{equation}
+with $\mathrm{delay}$ the latency capped at \SI{100}{\milli\second} and normalized. The base reward
+trades goodput against trust and is shifted to $[-1,1]$, and a probing penalty is subtracted:
+\begin{equation}
+r = \underbrace{2\big(w_1\,\mathrm{goodput} + w_2\,\mathrm{trust}\big) - 1}_{\text{base reward}}
+    \;-\; w_{\text{probe}}\cdot \mathrm{probe\_penalty},
+\label{eq:p1reward}
+\end{equation}
+clamped to $[-1,1]$, where $\mathrm{probe\_penalty}$ is the probing cost normalized to $[0,1]$. The
+five weights $\mathbf{w} = (w_1, w_2, w_3, w_4, w_{\text{probe}})$ are exactly the \emph{application
+intent}: default balanced values are $(0.7, 0.3, 0.5, 0.5, 0.05)$, but a throughput-hungry intent
+pushes $w_1$ toward~1, a loss-averse intent raises $w_2$ and $w_3$, a latency-sensitive intent raises
+$w_4$, and a probe-frugal intent raises $w_{\text{probe}}$. The design goal of \cref{sec:p1design:film}
+is a \emph{single} policy that behaves correctly for \emph{any} setting of $\mathbf{w}$.
+
+\subsection{Handling a Variable Path Set: The Scoring Architecture}
+\label{sec:p1design:scoring}
+
+To make the policy independent of the path count, we score each path with a \emph{shared} network and
+select by comparison, following the permutation-equivariant design of \cref{sec:background:variable}.
+The global context is broadcast and concatenated to every path's feature row, and a shared multilayer
+perceptron maps each $(\text{global}, \text{path}_i)$ pair to a scalar $Q$-value. Selection is
+$\arg\max_i Q_i$; absent or invalid paths are masked to $-10^9$ so they can never be chosen and do not
+distort training targets.
+
+We use a \emph{dueling} scoring head (\cref{sec:background:rl}): a value stream reads the global context
+alone to produce $V(s)$, an advantage stream reads the per-path features to produce $A(s, i)$, and the
+two combine as $Q_i = V(s) + \big(A(s,i) - \operatorname{mean}_{j\in\text{valid}} A(s,j)\big)$ with the
+mean taken only over valid paths. Because many paths are often comparably good, separating ``how good is
+this situation'' from ``which path is marginally better'' stabilizes learning. Double DQN targets and
+prioritized replay (\cref{sec:background:rl}) further stabilize and accelerate training. The scoring
+design also delivers the dynamic-action property directly: the same weights serve a pair with three
+paths and a pair with thirty, and are invariant to how the paths happen to be ordered.
+
+\section{Intent Conditioning via Feature-Wise Linear Modulation}
+\label{sec:p1design:film}
+
+The central contribution of this chapter is making one scoring policy serve every intent $\mathbf{w}$. We
+condition the network on $\mathbf{w}$, but the \emph{mechanism} of conditioning is what makes or breaks
+it.
+
+\subsection{Why concatenation fails}
+\label{sec:p1design:concat}
+The obvious approach is to append $\mathbf{w}$ to the state. But consider a scoring policy: the intent
+is part of the \emph{global} context, which is broadcast \emph{identically} to every path before
+scoring. Adding the same constant vector to every path's input tends to move all path scores by a
+similar amount -- a common-mode shift -- which leaves the $\arg\max$, and hence the chosen path,
+essentially unchanged. Formally, if conditioning enters only additively and symmetrically across paths,
+it cancels under the comparison that defines the action. The policy can thus appear to ``take intent as
+input'' while its behavior is invariant to it. This is not a hypothetical; it is the failure mode our
+ablation in \cref{sec:p1eval:ablation} is designed to expose, and it is why a naive goal-conditioned
+baseline is inadequate.
+
+\subsection{Weight-FiLM dueling head}
+The fix is to let the intent modulate the \emph{per-path} features multiplicatively, so that it changes
+the relative ranking of paths rather than a shared baseline. A small conditioning network maps the intent
+vector to feature-wise scale and shift parameters,
+\begin{equation}
+(\gamma, \beta) = \mathrm{FiLM}_\theta(\mathbf{w}), \qquad
+\tilde{f}_i = (1 + \gamma) \odot f_i + \beta,
+\label{eq:p1film}
+\end{equation}
+where $f_i$ is path~$i$'s feature row and $\tilde{f}_i$ the modulated features fed to the advantage
+stream. A latency-sensitive intent can learn a $\gamma$ that amplifies the latency feature, so paths
+differ more sharply in their latency contribution and a low-latency path wins; a throughput-hungry intent
+can instead amplify bandwidth. Because the modulation is per-feature and multiplicative, it acts
+\emph{differently} on paths with different feature values and therefore genuinely reorders them -- exactly
+what concatenation cannot do. The value stream continues to read only the topology/time context, keeping
+the state-value estimate intent-agnostic while the advantage -- the part that decides \emph{which} path --
+is intent-modulated.
+
+\subsection{Training across intents}
+To learn a policy that spans the intent space we train across a set of \emph{reward profiles} -- named
+weight vectors spanning balanced, throughput-maximizing, trust/loss-averse, latency-sensitive, and
+probe-frugal extremes. Each training episode samples a profile, sets the environment's reward weights to
+it, and feeds the same weights to the FiLM head, so the agent simultaneously experiences the reward for an
+intent and the encoding of that intent. Profiles are scheduled in a stratified fashion so every intent
+receives balanced coverage. At inference, presenting a new $\mathbf{w}$ -- including interpolations between
+trained profiles -- yields the corresponding behavior without any retraining.
+
+\subsection{Relation to Mortise}
+This is the path-selection instance of Mortise's principle~\cite{Shen2026}. Where Mortise maps an
+application's revealed QoS preference to congestion-control \emph{parameters}, our FiLM head maps an
+explicit intent vector to a \emph{modulation} of path features that determines which path is chosen. In
+both, intent is a first-class input that reshapes a network mechanism, not a constant compiled into it.
+\Cref{ch:multipath} pushes the same principle one step further, letting intent shape not only the network's
+choice but the application's own output.
+
+\section{Implementation}
+\label{sec:sp:impl}
+
+This section describes how the design is realized: the agent family and their architectures
+(\cref{sec:p1impl:agents}), the end-to-end evaluation pipeline that turns a topology into trained models
+and comparable results (\cref{sec:p1impl:pipeline}), and the baselines and probing accounting against
+which the learned selectors are measured (\cref{sec:p1impl:baselines}). The implementation is in Python
+(PyTorch for the agents) and is organized so that each pipeline stage passes data to the next through
+timestamped run directories.
+
+\subsection{Agent Family}
+\label{sec:p1impl:agents}
+
+The codebase implements a family of agents of increasing capability, which also serve as the ablation
+ladder in \cref{sec:p1eval:ablation}.
+
+\begin{description}
+  \item[Flat DQN (simple / enhanced).] A conventional fixed-action DQN over the 5-dimensional global
+  state. The \emph{simple} variant is a small multilayer perceptron with $\varepsilon$-greedy
+  exploration and a periodic target network; the \emph{enhanced} variant adds Double
+  DQN~\cite{VanHasselt2016}, a dueling head~\cite{Wang2016}, prioritized experience
+  replay~\cite{Schaul2016}, soft target updates, and action masking. These agents cannot handle a
+  variable path set and stand in for the original design~\cite{Bourak2025}.
+  \item[Path-scoring DQN (simple / enhanced).] The permutation-equivariant design of
+  \cref{sec:p1design:scoring}: a shared per-path scorer producing one $Q$-value per path, with variable
+  $N$ handled by padding to the batch maximum and masking. The enhanced variant uses the dueling scoring
+  head, Double DQN, and prioritized replay. This family delivers the dynamic-action property.
+  \item[Conditional path-scoring DQN.] The recommended agent, adding the weight-FiLM dueling head of
+  \cref{sec:p1design:film}. Its global state is extended with the five-dimensional encoded intent vector,
+  and the FiLM sub-network modulates the per-path features feeding the advantage stream. Two intent
+  encodings are supported and recorded in the checkpoint -- the raw weights, or a policy-friendly rescaling
+  to $[-1,1]$ for smoother gradients.
+\end{description}
+
+\paragraph{Training details.} Prioritized replay uses priority exponent $\alpha = 0.6$ with the
+importance-sampling exponent $\beta$ annealed from $0.4$ to $1.0$. Target networks use soft (Polyak)
+updates. Invalid actions are masked to a large negative value both when acting and when forming
+bootstrap targets, so masked paths never contribute to the loss. The conditional agent is trained across
+reward profiles on a stratified schedule (\cref{sec:p1design:film}), so that within a single training run
+the network sees every intent an equal number of times.
+
+\subsection{Evaluation Pipeline}
+\label{sec:p1impl:pipeline}
+
+The system is driven by a six-stage pipeline, each stage writing artifacts consumed by the next:
+
+\begin{enumerate}
+  \item \textbf{Topology generation} -- BRITE produces an AS graph, converted into SCION roles, ISDs, and
+  links.
+  \item \textbf{Beaconing} -- PCB propagation discovers up/core/down segments and composes candidate paths
+  per source--destination pair.
+  \item \textbf{Traffic simulation} -- 28~days of hourly demand with per-link aggregation, producing the
+  time-varying link states the environment replays.
+  \item \textbf{Training} -- all agent variants are trained on the resulting environment; checkpoints and
+  per-episode statistics are saved.
+  \item \textbf{Evaluation} -- every method (learned and baseline) is run over held-out pairs, hours, and
+  intents, logging reward, achieved latency and bandwidth, probing overhead, and selection time.
+  \item \textbf{Figures} -- results are rendered in a consistent style for the report.
+\end{enumerate}
+
+Running the whole pipeline is a single command; intermediate artifacts (topology, path store, link
+states, checkpoints, results tables) live under a timestamped run directory so that any stage can be
+re-run or inspected in isolation. Key knobs -- topology size, number of training episodes, the cap on
+training pairs, and learning hyperparameters -- are exposed as configuration so that experiments can be
+scaled up or down.
+
+\subsection{Baselines and Probing Accounting}
+\label{sec:p1impl:baselines}
+
+\paragraph{Baselines.} Six heuristic selectors provide the comparison points: shortest-path,
+widest-path, lowest-latency, ECMP, the SCION default selection, and random. They span the spectrum from
+naive (random) to strong single-metric heuristics (widest for throughput, lowest-latency for delay), so
+that the learned selectors must beat not just a weak baseline but the \emph{right} heuristic for each
+intent.
+
+\paragraph{Probing accounting.} A fair comparison must charge each method for the measurements it needs.
+The environment therefore records, per decision, which paths a method probed and at what cost -- latency
+probes being cheap and full bandwidth probes expensive (\cref{sec:p1design:env}). Heuristics that require
+a metric on every path (e.g.\ widest-path) incur the cost of probing all paths, whereas the learned
+selector is charged only for the paths it actually inspects. This makes the probing-overhead reduction a
+directly measurable quantity rather than an assumed benefit, and is the mechanism by which we reproduce
+and test the near-oracle-quality-at-low-probing claim of Bourak~et~al.~\cite{Bourak2025}.
+
+\section{Experimental Evaluation and Intent Alignment}
+\label{sec:sp:eval}
+
+This section evaluates the selectors on held-out pairs, hours, and intents. We first fix the
+experimental setup and metrics (\cref{sec:p1eval:setup}). We then answer three questions the design
+raises, in turn: does intent conditioning need modulation rather than concatenation
+(\cref{sec:p1eval:ablation})? Does the conditioned policy genuinely re-rank paths as the intent changes
+(\cref{sec:p1eval:intent})? And does it retain the near-oracle-quality-at-low-probing property of the
+selector it builds on (\cref{sec:p1eval:overhead})? \Cref{sec:p1eval:ceiling} then turns to the limit
+that motivates the next chapter.
+
+\subsection{Experimental Setup}
+\label{sec:p1eval:setup}
+
+\paragraph{Environment.} Experiments use one BRITE-generated SCION topology of 90~ASes and 528~inter-AS
+links, partitioned into 2~ISDs with 6~core ASes. Beaconing (\cref{sec:p1impl:pipeline}) discovers
+1004~core segments and 1127~up/down segments, which compose into candidate paths for 8010~routable
+source--destination pairs, each with up to 30~paths. The network is driven by the 28-day hourly demand
+model with per-link aggregation (\cref{sec:p1design:env}).
+
+\paragraph{Train/test split.} Training uses the first 14~days; all numbers in this chapter are measured
+on the last 14~days (336~held-out hours), a window the agents never trained on. Unless noted, each cell
+of a results table aggregates 32~held-out pairs across those 336~hours, i.e.\ 10752~independent decision
+contexts.
+
+\paragraph{Intents.} The conditional agent is trained across the reward profiles of
+\cref{sec:p1design:film} and evaluated on the four \emph{selection-relevant} distinctive profiles:
+throughput (\emph{Throughput}), latency-averse (\emph{Low-Latency}), loss-averse (\emph{Low-Loss}), and
+a balanced extreme (\emph{Balanced}). The probe-frugal profiles are excluded from the conditioning
+studies because $w_{\text{probe}}$ is path-independent for a single-path selector and so cannot change
+the chosen path; probing cost is instead the subject of \cref{sec:p1eval:overhead}.
+
+\paragraph{Metrics.} For each method we report the intent-weighted reward of \cref{eq:p1reward} and the
+achieved per-flow goodput and latency. Intent alignment is assessed two ways: by reward under each
+intent, and by \emph{behavioral divergence} -- the degree to which the chosen path changes as the intent
+vector changes, holding the decision context fixed. Concretely, for each context we count the distinct
+paths a method selects across the four intents and normalize to $[0,1]$, so a method that ignores intent
+scores~0 and one that picks a different path for every intent scores~1. Probing cost is measured by the
+per-selection probe accounting of \cref{sec:p1impl:baselines}.
+
+\subsection{Does Conditioning Need Modulation? The FiLM Ablation}
+\label{sec:p1eval:ablation}
+
+The central design claim of this chapter is that intent must \emph{modulate} the per-path features, not
+merely be concatenated to the state (\cref{sec:p1design:concat}). We test it by walking up the agent
+ladder of \cref{sec:p1impl:agents}: a Flat DQN with a single baked-in objective, a Conditional-Concat
+agent that receives the intent in its value stream, and the Conditional-FiLM agent that modulates the
+advantage stream with it. \Cref{tab:p1eval:ablation} reports the mean reward each agent attains under each
+intent, together with its adaptivity (mean behavioral divergence across intents).
+
+\begin{table}[t]
+  \centering
+  \caption{Intent-conditioning ablation. Mean intent-weighted reward under each of the four intents, and
+  \emph{Adaptivity} -- the mean behavioral divergence across intents (0~=~intent-invariant path choice,
+  1~=~a different path per intent). Each reward cell aggregates 10752~held-out decisions.}
+  \label{tab:p1eval:ablation}
+  \begin{tabular}{lccccc}
+    \toprule
+    Method & Throughput & Low-Latency & Low-Loss & Balanced & Adaptivity \\
+    \midrule
+    Flat DQN            & 0.333 & 0.701 & 0.868 & 0.561 & 0.011 \\
+    Conditional-Concat  & 0.979 & 0.708 & 0.937 & 0.894 & 0.050 \\
+    Conditional-FiLM    & 0.980 & 0.732 & 0.939 & 0.894 & 0.128 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Three findings stand out. First, the unconditioned Flat DQN collapses onto a single trade-off: it scores
+well on Low-Loss (0.868) but poorly on Throughput (0.333) and Balanced (0.561), and its adaptivity of
+0.011 confirms it selects essentially the same path regardless of the intent it is asked to serve -- as
+it must, having no intent input. Second, both conditional agents recover strong reward on every intent,
+because both receive the intent vector. The decisive difference is \emph{how much they act on it}: the
+FiLM head re-ranks paths far more than concatenation, with an adaptivity of 0.128 against 0.050 -- a
+factor of roughly 2.5 -- and a correspondingly higher choice entropy (0.31 versus 0.13~bits). This is the
+predicted signature of common-mode cancellation: an intent that enters only the value stream shifts all
+path scores together and largely survives the $\arg\max$ unchanged, so Concat under-reacts even though it
+technically ``takes intent as input.''
+
+Third, and most telling, the extra re-ranking that FiLM performs is not idle motion: it converts into
+reward exactly on the intent that requires re-ranking. On Throughput, Low-Loss, and Balanced the two
+conditional agents tie, because those objectives are served by the same high-bandwidth paths the value
+estimate already favors. On Low-Latency -- the intent that must steer \emph{away} from the high-bandwidth
+default toward short, lightly loaded paths -- FiLM leads Concat, 0.732 against 0.708. We find that FiLM
+matches or exceeds concatenation on every intent while never falling below it, and that the behavioral
+divergence exposes the mechanism gap even where the reward gap is small.
+
+\subsection{Intent Alignment}
+\label{sec:p1eval:intent}
+
+Adaptivity establishes that the FiLM policy changes its choice with intent; this section shows that it
+changes it in the \emph{right} direction. We evaluate the single trained FiLM checkpoint under each
+intent and measure both the reward it earns and the metrics of the paths it selects.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.72\linewidth]{p1eval_intent_heatmap.png}
+  \caption{Reward matrix $R(\text{intent told}, \text{objective scored})$ for the FiLM policy. Cell
+  color is the reward relative to its column mean, so a red diagonal means that conditioning on an intent
+  is the best way to score well under that same objective. The diagonal dominates the two objectives that
+  trade off against the high-bandwidth default (Throughput, Low-Latency) and ties on the objectives that
+  do not (Low-Loss, Balanced).}
+  \label{fig:p1eval:heatmap}
+\end{figure}
+
+\Cref{fig:p1eval:heatmap} reports the reward $R(i, j)$ obtained when the agent is told intent~$i$ but its
+choice is scored under objective~$j$; each cell is colored by its deviation from the column mean. Reading
+down a column asks: to do well under this objective, which intent should the agent be given? For
+Throughput the answer is unambiguous -- being told ``Throughput'' scores 0.98, far above any mismatched
+intent, and telling the agent the wrong intent (Low-Latency) drops it to 0.75. For Low-Latency the
+matching intent again wins its column (0.73), and the mismatch penalty is largest here, precisely because
+latency is the objective that most demands re-ranking. For Low-Loss and Balanced the diagonal is a
+near-tie: low-loss, low-delay paths coincide with the high-bandwidth paths that most intents already
+prefer, so several intents score alike. The conditioning helps most, in other words, exactly where the
+objectives genuinely conflict.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{p1eval_intent_boxplots.png}
+  \caption{Distributions of the chosen path's metrics as the FiLM policy is conditioned on each intent,
+  over a fixed set of decision contexts. The Low-Latency intent lowers the chosen latency, the Throughput
+  intent raises the chosen goodput, and the Low-Loss intent raises the chosen path's trust.}
+  \label{fig:p1eval:boxplots}
+\end{figure}
+
+\Cref{fig:p1eval:boxplots} shows the same behavior in the physical metrics of the chosen paths. Holding
+the decision contexts fixed and varying only the intent, the Low-Latency intent shifts the chosen-latency
+distribution down (median near \SI{12.5}{\milli\second} against roughly \SI{17}{\milli\second} for the
+other intents), the Throughput intent shifts the chosen-goodput distribution up, and the Low-Loss intent
+raises the trust of the chosen path. A single set of weights, conditioned on different intents, re-ranks
+the same candidate paths along whichever axis the intent emphasizes -- the modulative behavior the FiLM
+head was designed to produce.
+
+\subsection{Probing Overhead}
+\label{sec:p1eval:overhead}
+
+A path selector is only useful if its selection quality does not come at the price of measuring every
+path on every decision. Using the probing accounting of \cref{sec:p1impl:baselines}, we compare the FiLM
+selector against the six heuristics under the Balanced intent so that goodput and reward are directly
+comparable.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.72\linewidth]{p1eval_probing.png}
+  \caption{Achieved goodput against probing cost per selection (top-left is better). The FiLM selector
+  reaches the goodput of exhaustive widest-path selection while probing a single path instead of all~30,
+  cutting probing cost by roughly \(40\times\). The load-blind heuristics -- including ECMP and the SCION
+  default -- probe more cheaply but select worse.}
+  \label{fig:p1eval:probing}
+\end{figure}
+
+\Cref{fig:p1eval:probing} places each method in the quality--cost plane. Widest-path attains the highest
+goodput (\SI{8.24}{\giga\bit\per\second}) but must issue a full bandwidth probe on all 30~candidate
+paths, at \SI{5388}{\milli\second} of probing per selection. The FiLM selector reaches
+\SI{8.15}{\giga\bit\per\second} -- within about 1\% of widest-path -- while inspecting only the single
+path it selects, at \SI{135}{\milli\second} per selection: a reduction in probing cost of roughly
+$40\times$ at matched goodput. Because it probes so little, its intent-weighted reward (0.894) even edges
+out widest-path (0.891), which pays the probing penalty 30~times over. The load-blind heuristics probe
+cheaply but choose worse: ECMP, the strongest of them, reaches only \SI{6.6}{\giga\bit\per\second}, and
+the SCION default, shortest-path, and lowest-latency deliver \SIrange{5.8}{6.1}{\giga\bit\per\second} --
+roughly 20--40\% less goodput than FiLM -- because none of them inspects bandwidth. We thus reproduce,
+for the conditioned selector, the near-oracle-quality-at-low-probing result of
+Bourak~et~al.~\cite{Bourak2025}.
+
+\section{The Single-Path Performance Ceiling}
+\label{sec:p1eval:ceiling}
+
+The results so far show that one conditioned policy can serve the full intent spectrum at low probing
+cost. This final experiment asks the question that motivates the next chapter: how far does the best
+single-path choice carry an application as the network fills up? We bin every held-out decision by its
+realized congestion -- the mean utilization across the flow's candidate paths at that hour -- and plot
+the goodput each method achieves against it (\cref{fig:p1eval:ceiling}).
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.72\linewidth]{p1eval_ceiling.png}
+  \caption{Achieved goodput against realized congestion (mean path utilization). The FiLM selector tracks
+  the widest-path ceiling at every load, but that ceiling itself falls by about 25\% from light to heavy
+  congestion: past a point, no single path can carry the demand. Load-blind heuristics degrade far more
+  steeply.}
+  \label{fig:p1eval:ceiling}
+\end{figure}
+
+Two effects appear. First, the FiLM selector tracks the widest-path ceiling across the entire congestion
+range, confirming that it makes near-optimal use of whatever single-path capacity exists, while the
+load-blind heuristics fall away sharply -- shortest-path, lowest-latency, and the SCION default lose
+roughly 55--58\% of their goodput from the lightest to the heaviest congestion bin, ECMP degrades more
+gracefully but still loses about 39\%, and random collapses entirely. Second, and crucially, \emph{the
+ceiling itself descends}: even FiLM and widest-path drop from about \SI{9.1}{\giga\bit\per\second} at
+light load to about \SI{6.8}{\giga\bit\per\second} at heavy load, a loss of roughly 25\%. This is the
+single-path performance ceiling. When the shared bottleneck is congested, the best available path is
+still one path, and one path can carry only so much; no amount of intent-aware selection recovers the
+capacity that a single link cannot provide. Escaping this ceiling requires spreading a flow across
+several paths at once -- the problem \cref{ch:multipath} takes up.
+
+\paragraph{Summary.} This chapter established four claims. One conditioned scoring policy serves the full
+intent spectrum, matching a per-intent-strongest heuristic on each objective with a single model. Making
+that conditioning effective requires modulation: FiLM re-ranks paths $2.5\times$ more than value-stream
+concatenation and wins on the intent that most demands re-ranking, whereas concatenation under-reacts
+through common-mode cancellation. The learned selector reaches widest-path goodput while probing roughly
+$40\times$ less, reproducing the near-oracle-quality-at-low-probing property it builds on. And even this
+near-optimal single-path selector loses about a quarter of its goodput under heavy congestion, because a
+single path is a hard capacity bound -- the ceiling that \cref{ch:multipath} sets out to break.

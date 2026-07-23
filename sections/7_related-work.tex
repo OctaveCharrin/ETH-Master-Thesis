@@ -14,13 +14,12 @@ goal-conditioned and modulated policies (\cref{sec:rel:gcrl}), and intent-based 
 A line of work applies reinforcement learning to routing and traffic engineering. \emph{Learning to
 Route}~\cite{Valadarsky2017} studies RL and learned representations for routing, and experience-driven
 networking~\cite{Xu2018} uses deep RL for traffic-engineering decisions. These target network-operator
-objectives (e.g.\ minimizing congestion globally) from a control-plane vantage point. Our Part~I differs in
+objectives (e.g.\ minimizing congestion globally) from a control-plane vantage point. Our single-path selector differs in
 both the actor and the objective: the decision is made by an \emph{endpoint} choosing among
 cryptographically authenticated SCION paths, and the objective is the \emph{application's} intent rather than
 a global network utility. Most directly related is the DQN SCION path selector of
 Bourak~et~al.~\cite{Bourak2025}, which we extend; the differences -- a variable-action scoring architecture
-and FiLM-based intent conditioning that removes the single-objective limitation -- are the substance of
-Part~I.
+and FiLM-based intent conditioning that removes the single-objective limitation -- are the substance of \cref{ch:single_path}.
 
 \section{Learned Congestion Control and Multipath Scheduling}
 \label{sec:rel:transport}
@@ -31,7 +30,7 @@ is the closest in spirit: it auto-tunes congestion-control parameters to the run
 its principle -- intent as an input that reshapes a mechanism -- is the template we transplant into path
 selection and joint multipath control. For multipath \emph{scheduling}, ReLeS~\cite{Zhang2019} learns a
 Multipath QUIC scheduler and Peekaboo~\cite{Wu2020} learns to schedule across heterogeneous paths in dynamic
-environments; both optimize a scheduling policy for a given, exogenous load. Part~II's distinction is that it
+environments; both optimize a scheduling policy for a given, exogenous load. The multipath system's distinction is that it
 does \emph{not} treat the offered load as fixed: it co-optimizes the application's bitrate with the split, so
 the controller can relieve congestion it would otherwise create -- a coupling those schedulers, and the
 Multipath TCP mechanisms of RFC~8684~\cite{RFC8684}, do not address.
@@ -41,7 +40,7 @@ Multipath TCP mechanisms of RFC~8684~\cite{RFC8684}, do not address.
 
 Learned adaptive bitrate control, exemplified by Pensieve~\cite{Mao2017}, showed RL beating hand-crafted ABR
 heuristics for buffered video streaming, using QoE-shaped rewards and quality metrics such as
-VMAF~\cite{VMAF2016}. Our Part~II shares the QoE-driven, learned-bitrate stance but targets \emph{real-time}
+VMAF~\cite{VMAF2016}. Our multipath system shares the QoE-driven, learned-bitrate stance but targets \emph{real-time}
 video (no playback buffer, deadline-based loss) and, crucially, couples the bitrate decision to a
 simultaneous multipath scheduling decision. Where Pensieve adapts rate to a single, exogenous network path,
 we adapt rate \emph{and} decide how to spread it across several paths, jointly.
@@ -53,9 +52,9 @@ congestion-control algorithm cannot be optimal for every application, and instea
 the algorithm's parameters to maximize the running application's QoE, using the application's revealed
 preferences over throughput, latency, and loss to steer the tuning. The essential idea -- treat
 application intent as a first-class input that reshapes a network mechanism rather than a constant
-compiled into it -- is exactly what we transplant. Part~I applies it to \emph{path selection} (which
-path to use), and Part~II applies it to \emph{joint rate and multipath scheduling} (what the
-application sends and how it is spread across paths).
+compiled into it -- is exactly what we transplant. The single-path selector applies it to \emph{path selection} (which
+path to use), and the multipath system applies it to \emph{joint rate and multipath scheduling} (what
+the application sends and how it is spread across paths).
 
 \section{Goal-Conditioned and Modulated Policies}
 \label{sec:rel:gcrl}

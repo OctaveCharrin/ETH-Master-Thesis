@@ -1,0 +1,33 @@
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.synctex
+*.dvi
+*.ps
+*.ps.gz
+*.idx
+*.ilg
+*.ind
+*.nav
+*.snm
+*.vrb
+*.bcf
+*.run.xml
+*.xdv
+*.figlist
+*.makefile
+*.auxlock
+sections/*.aux
+texput.log
+
+# Compiled PDF (thesis output)
+thesis.pdf
