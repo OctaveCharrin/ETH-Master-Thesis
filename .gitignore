@@ -28,6 +28,3 @@
 *.auxlock
 sections/*.aux
 texput.log
-
-# Compiled PDF (thesis output)
-thesis.pdf
