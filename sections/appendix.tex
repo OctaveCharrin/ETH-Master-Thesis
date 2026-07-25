@@ -9,33 +9,66 @@ support the main text. Values still to be finalized from the experiment runs are
 
 The conditional path-selection agent is trained and evaluated across the reward-weight vectors
 $\mathbf{w} = (w_1, w_2, w_3, w_4, w_{\text{probe}})$ of \cref{eq:p1reward}, spanning distinct application
-intents. \Cref{tab:app:profiles} lists representative profiles.
+intents. \Cref{tab:app:profiles} lists the six profiles used, together with the label each carries in
+\cref{ch:single_path}.
 
 \begin{table}[h]
   \centering
-  \caption{Representative reward profiles (application intents) used in the single-path selection study (\cref{ch:single_path}). $w_1$ weights goodput,
-  $w_2$ trust, $w_3$ loss and $w_4$ delay within the trust term, and $w_{\text{probe}}$ the probing
-  penalty.}
+  \caption{The six reward profiles (application intents) used in the single-path selection study
+  (\cref{ch:single_path}). $w_1$ weights goodput, $w_2$ trust, $w_3$ loss and $w_4$ delay within the
+  trust term, and $w_{\text{probe}}$ the probing penalty. All six are used in training on a stratified
+  schedule; the four marked with a chapter label are also used in the evaluation of
+  \cref{sec:sp:eval}.}
   \label{tab:app:profiles}
-  \begin{tabular}{lccccc}
+  \begin{tabular}{llccccc}
     \toprule
-    Profile & $w_1$ & $w_2$ & $w_3$ & $w_4$ & $w_{\text{probe}}$ \\
+    Profile & Label in \cref{ch:single_path} & $w_1$ & $w_2$ & $w_3$ & $w_4$ & $w_{\text{probe}}$ \\
     \midrule
-    Balanced        & 0.70 & 0.30 & 0.50 & 0.50 & 0.05 \\
-    Throughput      & 0.95 & 0.05 & 0.35 & 0.35 & 0.05 \\
-    Trust / quality & 0.15 & 0.85 & 0.85 & 0.85 & 0.05 \\
-    Latency         & 0.45 & 0.55 & 0.25 & 0.95 & 0.05 \\
-    Low probe cost  & 0.70 & 0.30 & 0.50 & 0.50 & 0.005 \\
-    High probe cost & 0.70 & 0.30 & 0.50 & 0.50 & 0.25 \\
+    \texttt{bandwidth\_max}    & Throughput  & 1.00 & 0.00 & 0.05 & 0.05 & 0.05 \\
+    \texttt{delay\_averse}     & Low-Latency & 0.10 & 0.90 & 0.15 & 1.00 & 0.05 \\
+    \texttt{loss\_averse}      & Low-Loss    & 0.05 & 0.95 & 1.00 & 0.15 & 0.05 \\
+    \texttt{balanced\_extreme} & Balanced    & 0.55 & 0.45 & 0.55 & 0.55 & 0.05 \\
+    \texttt{probe\_minimal}    & --          & 0.70 & 0.30 & 0.50 & 0.50 & 0.001 \\
+    \texttt{probe\_averse}     & --          & 0.70 & 0.30 & 0.50 & 0.50 & 0.35 \\
     \bottomrule
   \end{tabular}
 \end{table}
 
 \section{Single-Path Selection: Agent Hyperparameters}
 \label{app:p1hyper}
-\gap{tabulate the final hyperparameters (hidden sizes, learning rate, discount $\gamma$, target-update
-rate, batch size, replay capacity, PER $\alpha$/$\beta$ schedule, number of training episodes) for the
-flat, scoring, and conditional agents.}
+
+\Cref{tab:app:p1hyper} lists the hyperparameters shared by the flat, scoring, and conditional agents of
+\cref{sec:p1impl:agents}; the flat agent differs only in training for 533~episodes rather than 666.
+
+\begin{table}[h]
+  \centering
+  \caption{Hyperparameters for the single-path selection agents (\cref{ch:single_path}).}
+  \label{tab:app:p1hyper}
+  \begin{tabular}{ll}
+    \toprule
+    Parameter & Value \\
+    \midrule
+    Hidden layers / width          & 2 / 128 \\
+    Learning rate (Adam)           & $10^{-3}$ \\
+    Discount $\gamma$              & 0.95 \\
+    Batch size                     & 32 \\
+    Replay capacity                & $10^4$ (minimum 500 before learning) \\
+    Target update                  & soft (Polyak), $\tau = 0.05$, every 100 gradient steps \\
+    Prioritized replay             & $\alpha = 0.6$, $\beta$ annealed $0.4 \rightarrow 1.0$ \\
+    Exploration                    & $\varepsilon$-greedy, $1.0 \rightarrow 0.01$, decay 0.995/episode \\
+    Dropout                        & 0.1 \\
+    Gradient clipping              & 1.0 \\
+    Episodes $\times$ steps        & $666 \times 24$ (flat: $533 \times 24$) \\
+    Gradient step frequency        & every 4 environment steps \\
+    Invalid-action mask value      & $-10^{9}$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\gap{add the two remaining columns this table cannot yet fill: the number of random seeds (currently one,
+which is the subject of a \gap\ in \cref{sec:p1eval:ablation}) and per-agent wall-clock training time,
+which the training loop does not presently record. Note also that $\varepsilon$ reaches only 0.035 at the
+end of a 666-episode run, so the stated 0.01 floor is never attained.}
 
 \section{Multipath System: QoE Weights and SAC Hyperparameters}
 \label{app:p2hyper}
@@ -50,5 +83,10 @@ RTT, cross-traffic intensity) for the static four-path and dynamic six-path scen
 
 \section{Supplementary Results}
 \label{app:extra}
-\gap{additional plots: per-episode training curves, per-intent path-choice distributions (single-path), and
-representative within-episode split traces (multipath).}
+\gap{three sets of supplementary plots, the first of which is already fully backed by saved data. (i)
+\emph{Training curves} for the four single-path agents, from the per-episode statistics files in the run
+directory: episode reward and loss over 533/666~episodes, plus the per-profile curves that the stratified
+schedule makes available (roughly 111~episodes per intent). These substantiate the convergence discussion
+in \cref{sec:p1impl:agents} and are the only place the two probe-frugality profiles appear at all. (ii)
+Per-intent path-choice distributions for the single-path selector. (iii) Representative within-episode
+split traces for the multipath system.}

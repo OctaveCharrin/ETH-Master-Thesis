@@ -1,53 +1,61 @@
 \chapter{Problem Statement \& Desired Properties}
 \label{ch:problem}
 
-This chapter formalizes the network decision problems addressed in this thesis[cite: 1]. We define the system model, state the operational decision spaces across single-path and multipath regimes[cite: 1], enumerate the essential properties a satisfactory solution must exhibit[cite: 1], and outline our core operating assumptions and trust boundaries[cite: 1].
+This chapter formalizes the network decision problems addressed in this thesis. We define the system model, state the operational decision spaces across single-path and multipath regimes, enumerate the essential properties a satisfactory solution must exhibit, and outline our core operating assumptions and trust boundaries.
 
 \section{Problem Formulation}
 \label{sec:problem:formulation}
 
-Consider an endpoint host communicating over a path-aware architecture such as SCION[cite: 1]. At any decision epoch $t$, the host discovers a dynamic set of $N_t$ candidate end-to-end paths $\mathcal{P}_t = \{p_1, \dots, p_{N_t}\}$[cite: 1]. Each path $p_i$ is characterized by partially observable and dynamic performance properties -- latency, loss rate, available bandwidth, hop count, and path trust[cite: 1]. Simultaneously, the running application expresses its \emph{intent} $g \in \mathcal{G}$, defined as a declarative preference vector prioritizing specific performance metrics (e.g., maximizing throughput, minimizing delay, or optimizing video quality)[cite: 1].
+Consider an endpoint host communicating over a path-aware architecture such as SCION. At any decision epoch $t$, the host discovers a dynamic set of $N_t$ candidate end-to-end paths $\mathcal{P}_t = \{p_1, \dots, p_{N_t}\}$. Each path $p_i$ is characterized by partially observable and dynamic performance properties -- latency, loss rate, available bandwidth, hop count, and path trust. Simultaneously, the running application expresses its \emph{intent} $g \in \mathcal{G}$, defined as a declarative preference vector prioritizing specific performance metrics (e.g., maximizing throughput, minimizing delay, or optimizing video quality).
 
-Because network utilization and link availability fluctuate over time, the host must dynamically determine how best to utilize the path set $\mathcal{P}_t$ to serve intent $g$[cite: 1]. We formulate this decision across two progressive operational settings[cite: 1]:
+Because network utilization and link availability fluctuate over time, the host must dynamically determine how best to utilize the path set $\mathcal{P}_t$ to serve intent $g$. We formulate this decision across two progressive operational settings:
 
 \begin{enumerate}
-  \item \textbf{Intent-Aware Single-Path Selection (Discrete Decision):} For general application flows constrained to a single path, the decision is a discrete selection $p^\star \in \mathcal{P}_t$[cite: 1]. The objective is to maximize an intent-weighted reward balancing goodput, latency, and trust while minimizing the active probing overhead required to inspect candidate path states (\cref{ch:single_path})[cite: 1].
+  \item \textbf{Intent-Aware Single-Path Selection (Discrete Decision):} For general application flows constrained to a single path, the decision is a discrete selection $p^\star \in \mathcal{P}_t$. The objective is to maximize an intent-weighted reward balancing goodput, latency, and trust while minimizing the active probing overhead required to inspect candidate path states (\cref{ch:single_path}).
   
-  \item \textbf{Joint Application--Network Multipath Optimization (Continuous Decision):} For high-bandwidth, latency-sensitive applications (e.g., real-time WebRTC video) operating over Multipath QUIC, the decision space expands[cite: 1]. The endpoint must jointly choose a continuous traffic split $\boldsymbol{w} = (w_1, \dots, w_{N_t})$ across paths (where $\sum w_i = 1$) \emph{and} adapt the application's own sending rate (the video encoder's target bitrate $R_{\mathrm{video}}$) to maximize real-time Quality of Experience (QoE) (\cref{ch:multipath})[cite: 1].
+  \item \textbf{Joint Application--Network Multipath Optimization (Continuous Decision):} For high-bandwidth, latency-sensitive applications (e.g., real-time WebRTC video) operating over Multipath QUIC, the decision space expands. The endpoint must jointly choose a continuous traffic split $\boldsymbol{w} = (w_1, \dots, w_{N_t})$ across paths (where $\sum w_i = 1$) \emph{and} adapt the application's own sending rate (the video encoder's target bitrate $R_{\mathrm{video}}$) to maximize real-time Quality of Experience (QoE) (\cref{ch:multipath}).
 \end{enumerate}
 
-In both formulations, the technical crux is twofold: (i) the objective is dynamic and dictated by an intent $g$ that varies across flows[cite: 1], and (ii) the action space is dynamic and dynamic, as candidate path sets $\mathcal{P}_t$ fluctuate across network topologies and over time[cite: 1].
+In both formulations, the technical crux is twofold: (i) the objective is dynamic and dictated by an intent $g$ that varies across flows, and (ii) the action space is dynamic and unbounded, as candidate path sets $\mathcal{P}_t$ fluctuate across network topologies and over time.
 
 \section{Desired Properties}
 \label{sec:problem:properties}
 
-A satisfactory solution must exhibit six key properties, which also define the primary metrics evaluated in subsequent chapters (\cref{ch:single_path,ch:multipath,ch:synthesis})[cite: 1]:
+A satisfactory solution must exhibit six key properties, which also define the primary metrics evaluated in subsequent chapters (\cref{ch:single_path,ch:multipath,ch:synthesis}):
+
+\gap{three of the six properties below are currently asserted rather than measured for the single-path
+system. \emph{Zero-Shot Generalization} is never tested: every intent reported in \cref{ch:single_path}
+is one of the reward profiles the agent trained on, and no interpolated or unseen weight vector is ever
+evaluated. \emph{Dynamic-Action Handling} is never tested: results are not broken down by candidate-path
+count $N$. \emph{Structural \& Topological Generalization} is never tested: only one topology exists, and
+the evaluation pairs are drawn from the same pool used for training. Either add the corresponding
+experiments (\cref{sec:sp:eval}) or restate these as design properties rather than evaluated ones.}
 
 \begin{description}
-  \item[Intent Alignment.] The policy must faithfully reflect the specified preference vector $g$[cite: 1]. Decisions under $g_{\mathrm{latency}}$ must prioritize low delay, whereas decisions under $g_{\mathrm{throughput}}$ must prioritize goodput[cite: 1]. A policy whose action choices remain invariant to changes in $g$ fails this requirement[cite: 1].
+  \item[Intent Alignment.] The policy must faithfully reflect the specified preference vector $g$. Decisions under $g_{\mathrm{latency}}$ must prioritize low delay, whereas decisions under $g_{\mathrm{throughput}}$ must prioritize goodput. A policy whose action choices remain invariant to changes in $g$ fails this requirement.
   
-  \item[Zero-Shot Generalization Across Objectives.] A single trained network must serve the entire spectrum of application intents without requiring per-objective model retraining or fine-tuning[cite: 1].
+  \item[Zero-Shot Generalization Across Objectives.] A single trained network must serve the entire spectrum of application intents without requiring per-objective model retraining or fine-tuning.
   
-  \item[Dynamic-Action Handling.] The policy architecture must natively accept dynamic candidate path counts $N_t$ without structural modification or retraining, remaining invariant to the arbitrary ordering of paths in $\mathcal{P}_t$[cite: 1].
+  \item[Dynamic-Action Handling.] The policy architecture must natively accept dynamic candidate path counts $N_t$ without structural modification or retraining, remaining invariant to the arbitrary ordering of paths in $\mathcal{P}_t$.
   
-  \item[Low Overhead.] Decision-making must remain computationally lightweight[cite: 1]. In single-path selection, active probing cost must be minimized[cite: 1]; in multipath real-time control, per-frame inference latency must fit comfortably within frame processing budgets ($\approx 33\,\mathrm{ms}$)[cite: 1].
+  \item[Low Overhead.] Decision-making must remain computationally lightweight. In single-path selection, active probing cost must be minimized; in multipath real-time control, per-frame inference latency must fit comfortably within frame processing budgets ($\approx 33\,\mathrm{ms}$).
   
-  \item[Structural \& Topological Generalization.] Performance must hold off-distribution across unseen topologies, dynamic path counts, and shifting traffic workloads[cite: 1].
+  \item[Structural \& Topological Generalization.] Performance must hold off-distribution across unseen topologies, dynamic path counts, and shifting traffic workloads.
   
-  \item[Robustness to Network Volatility.] The policy must sustain high performance under non-stationary conditions -- path churn, sudden link failures, and transient congestion bursts -- where static heuristics fail[cite: 1].
+  \item[Robustness to Network Volatility.] The policy must sustain high performance under non-stationary conditions -- path churn, sudden link failures, and transient congestion bursts -- where static heuristics fail.
 \end{description}
 
 \section{Assumptions \& Scope}
 \label{sec:problem:assumptions}
 
-We explicitly state the operating assumptions underlying our design[cite: 1]:
+We explicitly state the operating assumptions underlying our design:
 
 \begin{enumerate}
-  \item \textbf{Path-Aware Substrate.} The underlying network exposes multiple distinct end-to-end paths to the endpoint and honors source routing decisions, as provided by SCION[cite: 1]. We do not assume control over internal intra-AS routing decisions[cite: 1].
+  \item \textbf{Path-Aware Substrate.} The underlying network exposes multiple distinct end-to-end paths to the endpoint and honors source routing decisions, as provided by SCION. We do not assume control over internal intra-AS routing decisions.
   
-  \item \textbf{Observable Path Feedback.} Per-path metrics (latency, loss, bandwidth) are measurable via active probing (in single-path selection) or derived continuously from transport feedback (e.g., QUIC ACK frames and RTT samples)[cite: 1].
+  \item \textbf{Observable Path Feedback.} Per-path metrics (latency, loss, bandwidth) are measurable via active probing (in single-path selection) or derived continuously from transport feedback (e.g., QUIC ACK frames and RTT samples).
   
-  \item \textbf{Explicit Intent Declaration.} Application intent is declared as an explicit preference vector (e.g., reward profile weights or target QoE parameterizations)[cite: 1]. We do not attempt to infer latent intent from raw packet inspection[cite: 1].
+  \item \textbf{Explicit Intent Declaration.} Application intent is declared as an explicit preference vector (e.g., reward profile weights or target QoE parameterizations). We do not attempt to infer latent intent from raw packet inspection.
   
-  \item \textbf{Episodic Stationarity.} Network state is assumed roughly stationary within a brief decision epoch, though conditions may drift or shift abruptly between epochs[cite: 1].
+  \item \textbf{Episodic Stationarity.} Network state is assumed roughly stationary within a brief decision epoch, though conditions may drift or shift abruptly between epochs.
 \end{enumerate}

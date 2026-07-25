@@ -19,13 +19,13 @@ earns its keep.
 
 \paragraph{Intent conditioning turns a family of policies into one.} The central lesson of
 \cref{ch:single_path} is that the right way to serve many objectives is not many models but one model that
-takes the objective as input -- provided the objective is allowed to \emph{modulate} the decision rather
-than merely accompany it. The concatenation-versus-FiLM contrast (\cref{sec:p1design:film}) is the crisp
-version of this point: a conditioning signal that enters symmetrically across the alternatives cancels
-under the comparison that picks the action, so the policy can look conditioned while behaving identically.
-Feature-wise modulation avoids this because it changes the \emph{relative} salience of path features, and
-thus which path wins. This is a design principle, not a SCION-specific trick: any comparison-based selector
-conditioned on an objective should modulate its per-alternative features.
+takes the objective as input -- provided the objective reaches the part of the network that actually
+decides. \Cref{prop:p1cancel} is the crisp version of this point: a conditioning signal that enters
+identically across the alternatives cancels under the comparison that picks the action, so the policy can
+look conditioned while behaving identically. Feature-wise modulation avoids this by construction, because
+it changes the \emph{relative} salience of path features and thus which path wins. This is a design
+principle, not a SCION-specific trick: any comparison-based selector conditioned on an objective must
+route that objective into its per-alternative terms.
 
 \paragraph{The value of multipath control is a function of volatility.} The central lesson of
 \cref{ch:multipath} is that learned multipath scheduling ranges from nearly worthless to decisive
@@ -62,9 +62,11 @@ that is awkward or impossible in a destination-based Internet.
 The results are bounded in ways that the analysis (\cref{ch:analysis}) details and that fairness requires
 restating here. Both systems are evaluated in simulation, and the multipath system's headline
 dynamic-scenario numbers are from the mock backend pending NS-3 confirmation (\cref{sec:p2impl:gaps}).
-Intent in this thesis is \emph{declared}, not \emph{inferred}: we assume the application can state its
-objective, and we do not study how to recover a latent intent from traffic -- a natural but separate
-problem. The transport model is TCP-like rather than true Multipath QUIC, and the VMAF surrogate is
+The single-path study rests on one topology and one training seed, with a purely temporal train/test
+split, so its quantitative margins should be read as indicative rather than as established effect sizes
+(\cref{sec:p1eval:setup,sec:p1eval:ablation}). Intent in this thesis is \emph{declared}, not
+\emph{inferred}: we assume the application can state its objective, and we do not study how to recover a
+latent intent from traffic -- a natural but separate problem. The transport model is TCP-like rather than true Multipath QUIC, and the VMAF surrogate is
 bitrate-dominated, so absolute QoE figures should be read as relative comparisons rather than calibrated
 user scores. Finally, we have not addressed online, safe learning against live traffic, which any
 deployment would require. None of these undercut the two qualitative findings -- modulation-based
@@ -87,7 +89,8 @@ Two kinds of overhead matter: measurement and computation.
 is a first-class cost charged in the reward (\cref{eq:p1reward}) and accounted per decision
 (\cref{sec:p1impl:baselines}). The learned selector probes only the paths it inspects, in contrast to
 heuristics that require a metric on every path, so its measurement footprint is a fraction of an exhaustive
-scan at comparable selection quality -- the property confirmed in \cref{sec:p1eval:overhead}. In the
+scan at comparable selection quality -- and, in fact, smaller than that of every heuristic baseline, since
+each of those must measure all candidates before applying its rule (\cref{sec:p1eval:overhead}). In the
 multipath system (\cref{ch:multipath}), per-path state is derived from ordinary transport feedback (RTT
 samples, acknowledgements, loss signals) rather than dedicated probes, so the marginal measurement cost of
 the split decision is low.
@@ -118,10 +121,13 @@ topology size and path count grow, ideally on topologies larger than those seen 
 
 Generalization is required along three axes. \textbf{Across intents:} the FiLM conditioning of
 \cref{ch:single_path} is meant to interpolate to intents between (and, ideally, beyond) the trained reward
-profiles, so that a novel weight vector yields sensible behavior without retraining -- tested in
-\cref{sec:p1eval:intent}. \textbf{Across topologies and path counts:} the permutation-equivariant design
-gives structural generalization, but only empirical results can confirm it holds off the training
-distribution. \textbf{Across conditions:} the dynamic scenario of \cref{ch:multipath}
+profiles, so that a novel weight vector yields sensible behavior without retraining. This is currently
+untested -- \cref{sec:p1eval:intent} evaluates only trained profiles, and the experiment that would
+establish it is the subject of \cref{sec:p1eval:zeroshot}. \textbf{Across topologies and path counts:} the
+permutation-equivariant design gives structural generalization, but only empirical results can confirm it
+holds off the training distribution, and the single-path study evaluates one topology on pairs drawn from
+its own training pool (\cref{sec:p1eval:setup}). \textbf{Across conditions:} the dynamic scenario of
+\cref{ch:multipath}
 (\cref{sec:p2eval:results}) is itself a generalization stress test, since the policy must cope with churn
 and bursts rather than a stationary environment; the collapse of the fixed-schedule baselines there shows
 that static policies do \emph{not} generalize across volatility, which is the gap learned control fills.

@@ -14,8 +14,9 @@ DQN path selector for SCION into an intent-conditioned one, combining a permutat
 architecture that handles a variable, changing set of candidate paths with feature-wise modulation of path
 features by an intent vector; a single policy then serves a spectrum of objectives -- throughput,
 latency, trust, probe-frugality -- without retraining. We show, analytically and empirically, that
-conditioning must \emph{modulate} the decision rather than merely accompany it, since an additive signal
-cancels under the comparison that selects a path. Second, we ask what happens when several paths are used
+\emph{where} the conditioning enters decides whether it has any effect at all: a signal reaching only the
+terms shared by every candidate cancels under the comparison that selects a path, however much the policy
+is trained on it. Second, we ask what happens when several paths are used
 at once and the application is optimized alongside the network: a two-timescale hierarchical pair of
 reinforcement-learning agents co-optimizes a real-time video call's encoding bitrate and its per-path
 traffic split over Multipath QUIC. Here the central finding is that the value of learned multipath

@@ -22,6 +22,12 @@ holds the lever that determines how traffic is carried. The fundamental question
 paths -- given both the intention of the application and the current state of the network?
 \end{quote}
 
+\gap{the three headings that follow (``The Research Challenge'', ``Key Insights and Approach'',
+``Guiding Questions'') are starred, so they carry no number and do not appear in the table of contents --
+which currently jumps from Chapter~1 straight to \S1.1 Contributions. Either promote them to numbered
+sections, matching the 1.1~Motivation / 1.2~Contributions / 1.3~Organization structure the outline
+specifies, or demote them to \texttt{\textbackslash paragraph} so the chapter reads as continuous prose.}
+
 \section*{The Research Challenge}
 Answering this question is hard for three compounding reasons:
 \begin{enumerate}
@@ -33,7 +39,7 @@ Answering this question is hard for three compounding reasons:
 \section*{Key Insights and Approach}
 This thesis addresses these challenges through a unified principle inspired by recent transport-layer auto-tuning. The Mortise system~\cite{Shen2026} shows that network mechanisms can be steered by treating application \emph{intent} as an explicit, dynamic input rather than a constant compiled into an algorithm. We transplant this principle across two sequential operational control layers:
 
-\paragraph{1. Motivating Foundation: Intent-Aware Single-Path Selection.} We first investigate how application intent can modulate discrete path choice for general network flows. Building on the DQN path selector of Bourak~et~al.~\cite{Bourak2025}, we introduce a permutation-equivariant \emph{path-scoring} architecture that supports variable candidate path sets. Crucially, we condition the agent on application intent using \emph{feature-wise linear modulation} (FiLM)~\cite{Perez2018}. We unveil a key theoretical insight: \emph{naive feature concatenation fails in comparison-based selection because additive intent signals shift all candidate scores uniformly and cancel under argmax choice}. FiLM modulation solves this by multiplicatively scaling path features, enabling a single policy to adapt zero-shot across diverse application intents without retraining. However, this study also exposes a physical limitation: when congestion surges, even the optimal single path reaches an architectural performance ceiling.
+\paragraph{1. Motivating Foundation: Intent-Aware Single-Path Selection.} We first investigate how application intent can modulate discrete path choice for general network flows. Building on the DQN path selector of Bourak~et~al.~\cite{Bourak2025}, we introduce a permutation-equivariant \emph{path-scoring} architecture that supports variable candidate path sets. Crucially, we condition the agent on application intent using \emph{feature-wise linear modulation} (FiLM)~\cite{Perez2018}. We unveil a key theoretical insight: \emph{in comparison-based selection, a conditioning signal that reaches only the terms shared by every candidate cancels under the argmax and cannot change the chosen path, no matter how the policy is trained}. FiLM avoids this structurally, by multiplicatively scaling each candidate's own features so that the intent reorders them by construction, letting a single policy serve diverse application intents without retraining. However, this study also exposes a physical limitation: when congestion surges, even the best single path reaches an architectural performance ceiling.
 
 \paragraph{2. Joint Application--Network Optimization over Multipath.} Driven by the limitations of single-path selection, we expand our framework to co-optimize both the application and the network simultaneously. Leveraging SCION's native path multiplicity and Multipath-QUIC~\cite{DeConinck2017} transport, we address interactive real-time video streaming by controlling both \emph{what} the application produces (the video encoder's target bitrate) and \emph{how} the network carries it (the continuous per-path traffic split). We design a two-timescale hierarchical reinforcement-learning system comprising a slow application agent for bitrate adaptation and a fast transport agent for path scheduling. This closes the loop from high-level intent down to application generation. Here, we uncover a crucial operational insight: \emph{the value of learned multipath traffic splitting is a direct function of network volatility} -- it offers marginal gains in static networks, but becomes decisive under path churn and congestion bursts where application-only adaptation collapses.
 
@@ -52,11 +58,11 @@ Throughout this investigation, four central puzzles guide the reader:
 This thesis makes the following explicit, verifiable contributions:
 
 \begin{enumerate}
-  \item \textbf{An intent-conditioned single-path selection framework for SCION:} We extend the DQN path selector of Bourak~et~al.~\cite{Bourak2025} with a permutation-equivariant path-scoring network and a FiLM conditioning mechanism, enabling a single policy to realize a spectrum of application intents zero-shot (\cref{ch:single_path}).
+  \item \textbf{An intent-conditioned single-path selection framework for SCION:} We extend the DQN path selector of Bourak~et~al.~\cite{Bourak2025} with a permutation-equivariant path-scoring network and a FiLM conditioning mechanism, enabling a single policy to realize a range of application intents without per-objective retraining (\cref{ch:single_path}). \gap{restore the word ``zero-shot'' here once \cref{sec:p1eval:zeroshot} exists; as of this draft, every evaluated intent is one the agent trained on.}
 
-  \item \textbf{Theoretical and empirical proof of modulative intent conditioning:} We prove analytically and empirically that feature-wise modulation is required for comparison-based action selection, showing that state concatenation yields near-zero behavioral divergence across intents (\cref{ch:single_path}).
+  \item \textbf{An analysis of where intent conditioning must enter:} We show analytically that a conditioning signal reaching only the terms shared by every candidate cannot change a comparison-based selection, and confirm empirically that such a policy yields near-zero behavioral divergence across intents while feature-wise modulation does not (\cref{ch:single_path}).
 
-  \item \textbf{Verifiable probing reduction at near-oracle quality:} We demonstrate that our learned single-path selector matches or exceeds top per-intent heuristics while achieving significant probing overhead reductions compared to exhaustive measurement (\cref{ch:single_path}).
+  \item \textbf{Verifiable probing reduction at heuristic-matching quality:} We demonstrate that our learned single-path selector matches the strongest per-intent heuristics while cutting probing cost by roughly $40\times$ against exhaustive bandwidth measurement, and probing less than every heuristic baseline in absolute terms (\cref{ch:single_path}).
 
   \item \textbf{A hierarchical system for joint application--network co-optimization:} We design and implement a two-timescale hierarchical SAC framework for real-time video over Multipath QUIC, co-optimizing target bitrates and continuous path splits across NS-3 packet simulation and analytical testbeds (\cref{ch:multipath}).
 
