@@ -61,14 +61,19 @@ intents. \Cref{tab:app:profiles} lists the six profiles used, together with the 
     Episodes $\times$ steps        & $666 \times 24$ (flat: $533 \times 24$) \\
     Gradient step frequency        & every 4 environment steps \\
     Invalid-action mask value      & $-10^{9}$ \\
+    Random seeds                   & 5 (all agents) \\
+    Wall-clock per agent           & 1--3\,min (22-core CPU, no GPU) \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-\gap{add the two remaining columns this table cannot yet fill: the number of random seeds (currently one,
-which is the subject of a \gap\ in \cref{sec:p1eval:ablation}) and per-agent wall-clock training time,
-which the training loop does not presently record. Note also that $\varepsilon$ reaches only 0.035 at the
-end of a 666-episode run, so the stated 0.01 floor is never attained.}
+Two caveats on this table. The $\varepsilon$ schedule is stated as its configured range, but a run is too
+short to traverse it: at 0.995 decay per episode, $\varepsilon$ reaches only 0.036 after 666~episodes and
+0.069 after 533, so the 0.01~floor is never attained and all reported agents retain a few percent of
+exploration at the end of training. Seeding fixes network initialization, prioritized-replay sampling,
+and $\varepsilon$-greedy exploration; the environment's pair, hour, and profile streams are deliberately
+left fixed across seeds, so every seed sees the identical stream of training contexts and only the
+learning process varies.
 
 \section{Multipath System: QoE Weights and SAC Hyperparameters}
 \label{app:p2hyper}
@@ -83,10 +88,24 @@ RTT, cross-traffic intensity) for the static four-path and dynamic six-path scen
 
 \section{Supplementary Results}
 \label{app:extra}
-\gap{three sets of supplementary plots, the first of which is already fully backed by saved data. (i)
-\emph{Training curves} for the four single-path agents, from the per-episode statistics files in the run
-directory: episode reward and loss over 533/666~episodes, plus the per-profile curves that the stratified
-schedule makes available (roughly 111~episodes per intent). These substantiate the convergence discussion
-in \cref{sec:p1impl:agents} and are the only place the two probe-frugality profiles appear at all. (ii)
-Per-intent path-choice distributions for the single-path selector. (iii) Representative within-episode
-split traces for the multipath system.}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\linewidth]{p1app_training_curves.png}
+  \caption{Training curves for the single-path agents of \cref{sec:p1impl:agents}: episode reward
+  (25-episode moving average, left) and training loss (right) over the 533 or 666~episodes each agent was
+  trained for. The four path-scoring agents converge to within 0.01 of one another at roughly $+0.81$,
+  while the flat DQN plateaus near $+0.05$ with a \emph{rising} loss despite the identical budget, data,
+  and optimizer -- the evidence that its deficit is architectural rather than a matter of training time.
+  The simple scoring agent's loss also diverges, which is why the enhanced variant is used throughout.}
+  \label{fig:app:training}
+\end{figure}
+
+\Cref{fig:app:training} substantiates the convergence discussion of \cref{sec:p1impl:agents}. The
+per-episode statistics also carry the stratified schedule's profile label for each episode, giving
+roughly 111~episodes per intent for the conditional agents; these per-intent curves are the only place
+the two probe-frugality profiles of \cref{tab:app:profiles} appear, since \cref{sec:p1eval:setup}
+excludes them from the conditioning studies.
+
+\gap{two further sets of supplementary plots. (i) Per-intent path-choice distributions for the
+single-path selector. (ii) Representative within-episode split traces for the multipath system.}

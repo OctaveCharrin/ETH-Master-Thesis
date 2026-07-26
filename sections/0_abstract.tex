@@ -11,12 +11,13 @@ the current state of the network.
 We take a single idea from recent congestion-control work, that application intent should be a first-class
 input which reshapes a network mechanism, and push it into two settings. First, we turn a fixed-objective
 DQN path selector for SCION into an intent-conditioned one, combining a permutation-equivariant scoring
-architecture that handles a variable, changing set of candidate paths with feature-wise modulation of path
-features by an intent vector; a single policy then serves a spectrum of objectives -- throughput,
-latency, trust, probe-frugality -- without retraining. We show, analytically and empirically, that
+architecture that handles a variable, changing set of candidate paths with an intent vector supplied to
+the per-path comparison itself; a single policy then serves a range of application intents without
+retraining, including intents it never trained on. We show, analytically and empirically, that
 \emph{where} the conditioning enters decides whether it has any effect at all: a signal reaching only the
 terms shared by every candidate cancels under the comparison that selects a path, however much the policy
-is trained on it. Second, we ask what happens when several paths are used
+is trained on it. In this environment the axis along which intents genuinely conflict is goodput against
+latency -- loss is near zero on 99\% of selections -- so intent alignment is demonstrated there. Second, we ask what happens when several paths are used
 at once and the application is optimized alongside the network: a two-timescale hierarchical pair of
 reinforcement-learning agents co-optimizes a real-time video call's encoding bitrate and its per-path
 traffic split over Multipath QUIC. Here the central finding is that the value of learned multipath

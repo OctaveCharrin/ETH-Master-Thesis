@@ -9,7 +9,7 @@ bitrate control, and multipath transport mechanisms. \Cref{sec:background:rl} re
 the core reinforcement learning (RL) machinery: Markov decision processes, deep $Q$-networks 
 with standard refinements, soft actor-critic, and permutation-equivariant scoring architectures 
 for dynamic action spaces. Finally, \Cref{sec:background:intent} details goal-conditioned 
-policy representations and feature modulation techniques for conditioning decisions on application intent.
+policy representations and the goal-conditioning machinery that lets one policy serve many objectives.
 
 \section{The SCION Path-Aware Architecture}
 \label{sec:background:scion}
@@ -128,10 +128,10 @@ invariant to their ordering is achieved via the Deep Sets construction~\cite{Zah
 our continuous critic design. This structural approach decouples the policy from the cardinality of 
 the action set, allowing a single network to generalize across topologies with arbitrary numbers of paths.
 
-\section{Goal-Conditioned Reinforcement Learning \& FiLM Modulation}
+\section{Goal-Conditioned Reinforcement Learning}
 \label{sec:background:intent}
 
-\subsection{Goal-conditioned reinforcement learning}
+\subsection{Conditioning a policy on its objective}
 A policy that must serve diverse application preferences can be made a function of the objective itself. In
 goal-conditioned RL, the policy $\pi(a \mid s, g)$ and value function are conditioned on a goal vector $g$,
 so that a single neural network represents a whole family of behaviors. Universal value function approximators
@@ -141,15 +141,12 @@ achieved \emph{a posteriori}. In this thesis, the ``goal'' represents applicatio
 encoded as a vector of reward weights: the agent is explicitly told how much it should prioritize throughput 
 versus latency, jitter, loss, or trust, and is expected to adapt its decisions dynamically.
 
-\subsection{Feature-wise linear modulation}
-\emph{How} the intent vector conditions the network architecture is critical. The mechanism
-we adopt is feature-wise linear modulation (FiLM)~\cite{Perez2018}: a conditioning network maps
-the intent vector to per-feature scale and shift parameters $(\gamma, \beta)$, which affinely
-transform an intermediate feature representation $h$ as $\mathrm{FiLM}(h) = (1 + \gamma) \odot h + \beta$. 
-Because the modulation is multiplicative, it alters the \emph{relative} salience of different path
-features -- amplifying latency features for real-time intents while emphasizing bandwidth features for
-bulk transfers -- directly altering which candidate path scores highest. This matters most for
-comparison-based selection, where the action is an $\arg\max$ over per-alternative scores: a conditioning
-signal that enters only terms shared by every alternative shifts all scores together and cancels under
-the comparison, so the policy can consume the intent without ever acting on it. \Cref{sec:p1design:concat}
-makes this precise and \cref{sec:p1eval:ablation} measures it.
+\subsection{Where the conditioning signal enters}
+\emph{Where} the goal vector enters the network is as consequential as whether it is supplied at all, and
+the literature on goal-conditioned RL says little about it because its usual policies are not
+comparison-based. Our policies are. When the action is an $\arg\max$ over per-alternative scores, a
+conditioning signal that enters only terms shared by every alternative shifts all scores together and
+cancels under the comparison, so the policy can consume the goal without ever acting on it. The signal
+must instead reach the per-alternative terms, where it can interact with each candidate's own features
+and change their relative order. \Cref{sec:p1design:concat} makes this precise as
+\cref{prop:p1cancel}, and \cref{sec:p1eval:ablation} measures its consequences.

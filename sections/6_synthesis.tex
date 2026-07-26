@@ -22,10 +22,10 @@ earns its keep.
 takes the objective as input -- provided the objective reaches the part of the network that actually
 decides. \Cref{prop:p1cancel} is the crisp version of this point: a conditioning signal that enters
 identically across the alternatives cancels under the comparison that picks the action, so the policy can
-look conditioned while behaving identically. Feature-wise modulation avoids this by construction, because
-it changes the \emph{relative} salience of path features and thus which path wins. This is a design
-principle, not a SCION-specific trick: any comparison-based selector conditioned on an objective must
-route that objective into its per-alternative terms.
+look conditioned while behaving identically. Supplying the objective to the per-path terms avoids this,
+because the objective can then interact with each candidate's own feature values and change which one
+wins. This is a design principle, not a SCION-specific trick: any comparison-based selector conditioned
+on an objective must route that objective into its per-alternative terms.
 
 \paragraph{The value of multipath control is a function of volatility.} The central lesson of
 \cref{ch:multipath} is that learned multipath scheduling ranges from nearly worthless to decisive
@@ -69,9 +69,10 @@ split, so its quantitative margins should be read as indicative rather than as e
 latent intent from traffic -- a natural but separate problem. The transport model is TCP-like rather than true Multipath QUIC, and the VMAF surrogate is
 bitrate-dominated, so absolute QoE figures should be read as relative comparisons rather than calibrated
 user scores. Finally, we have not addressed online, safe learning against live traffic, which any
-deployment would require. None of these undercut the two qualitative findings -- modulation-based
-conditioning works where concatenation fails, and multipath control pays off in proportion to volatility --
-but they do delimit how far the quantitative results should be pushed.
+deployment would require. None of these undercut the two qualitative findings -- conditioning works when
+it reaches the per-alternative comparison and provably cannot when it does not, and multipath control
+pays off in proportion to volatility -- but they do delimit how far the quantitative results should be
+pushed.
 
 \section{System Analysis}
 \label{ch:analysis}
@@ -100,9 +101,13 @@ The single-path selector runs at path-selection granularity (seconds to minutes)
 The multipath transport agent is the tighter constraint: it runs \emph{per frame}
 (${\approx}\SI{33}{\milli\second}$ at 30\,fps), so its inference must fit well inside a frame interval. The
 scoring architecture keeps this affordable -- a shared per-path encoder evaluated $N$ times and a softmax --
-but the per-frame budget is the binding real-time constraint. \gap{report measured per-decision inference
-latency for both agents, and confirm the transport agent's inference fits within the frame budget on the
-target hardware.}
+but the per-frame budget is the binding real-time constraint. For the single-path selector the margin is
+ample: timing only the decision itself, over 1280~held-out contexts of 30~candidate paths each on a
+22-core CPU host with no GPU, the conditioned selector decides in under \SI{0.3}{\milli\second} on
+average and under \SI{2}{\milli\second} at the 99th percentile across repeated runs. That is three orders
+of magnitude inside a path-selection budget of seconds to minutes, and comfortably inside a
+\SI{33}{\milli\second} video frame. \gap{report the corresponding measurement for the multipath transport
+agent, whose per-frame budget is the tighter constraint.}
 
 \subsection{Scalability}
 \label{sec:analysis:scalability}
@@ -119,20 +124,29 @@ topology size and path count grow, ideally on topologies larger than those seen 
 \subsection{Generalization}
 \label{sec:analysis:generalization}
 
-Generalization is required along three axes. \textbf{Across intents:} the FiLM conditioning of
+Generalization is required along three axes. \textbf{Across intents:} the conditioning of
 \cref{ch:single_path} is meant to interpolate to intents between (and, ideally, beyond) the trained reward
-profiles, so that a novel weight vector yields sensible behavior without retraining. This is currently
-untested -- \cref{sec:p1eval:intent} evaluates only trained profiles, and the experiment that would
-establish it is the subject of \cref{sec:p1eval:zeroshot}. \textbf{Across topologies and path counts:} the
-permutation-equivariant design gives structural generalization, but only empirical results can confirm it
-holds off the training distribution, and the single-path study evaluates one topology on pairs drawn from
-its own training pool (\cref{sec:p1eval:setup}). \textbf{Across conditions:} the dynamic scenario of
+profiles, so that a novel weight vector yields sensible behavior without retraining.
+\Cref{sec:p1eval:zeroshot} confirms it: sweeping the intent along the segment between two trained
+profiles moves the chosen path's latency monotonically, with a Spearman correlation of $-1.000$ and no
+single step carrying more than a quarter of the span, and modest extrapolation beyond both endpoints
+continues the trend. \textbf{Across topologies and path counts:} the permutation-equivariant design gives
+structural generalization, and \cref{sec:p1eval:dynamic} confirms both halves of it empirically -- exact
+order invariance over 32256~permutation trials, and regret held two orders of magnitude below the
+fixed-action agent across a 15-fold range in candidate count. \Cref{sec:p1eval:ablation} adds a
+structurally disjoint set of 32~pairs spanning 32~source ASes never visited in training, on which the
+conditioned selector's optimality gap grows only from 0.0018 to 0.0033 while the flat agent's Throughput
+reward goes negative. What remains untested is scale: all of this is one topology of 90~ASes.
+\textbf{Across conditions:} the dynamic scenario of
 \cref{ch:multipath}
 (\cref{sec:p2eval:results}) is itself a generalization stress test, since the policy must cope with churn
 and bursts rather than a stationary environment; the collapse of the fixed-schedule baselines there shows
 that static policies do \emph{not} generalize across volatility, which is the gap learned control fills.
-\gap{quantify off-distribution degradation for both systems -- unseen intents, larger topologies, and
-unseen dynamics regimes -- to bound how gracefully performance decays.}
+For the single-path system, off-distribution degradation is bounded on two of these three axes:
+unseen intents cost nothing measurable (\cref{sec:p1eval:zeroshot}), and unseen pairs and candidate-set
+sizes cost at most about 0.01~reward (\cref{sec:p1eval:dynamic,sec:p1eval:ablation}).
+\gap{quantify the remaining axes -- larger topologies for both systems, and unseen dynamics regimes for
+the multipath system -- to bound how gracefully performance decays there.}
 
 \section{Deployment Considerations and Trust Assumptions}
 \label{sec:analysis:deployability}

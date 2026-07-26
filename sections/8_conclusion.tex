@@ -8,9 +8,9 @@ network mechanism, not as a constant compiled into it.
 
 \Cref{ch:single_path} turned a fixed-objective DQN path selector for SCION~\cite{Bourak2025} into an
 intent-conditioned one. Two design decisions carried the work: a permutation-equivariant \emph{scoring}
-architecture that handles a variable, changing set of candidate paths, and a \emph{feature-wise modulation}
-of path features by the intent vector that lets a single policy serve the whole spectrum of objectives
-without retraining. \Cref{ch:multipath} asked what happens if we use several paths at once and optimize the
+architecture that handles a variable, changing set of candidate paths, and the routing of the intent vector
+into the \emph{per-path comparison} itself, which lets a single policy serve a range of objectives --
+including ones it never trained on -- without retraining. \Cref{ch:multipath} asked what happens if we use several paths at once and optimize the
 application itself, and built a
 two-timescale hierarchical agent pair that co-optimizes video bitrate and per-path traffic split over
 Multipath QUIC, coupled so that each agent accounts for the other.

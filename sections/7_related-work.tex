@@ -19,7 +19,7 @@ both the actor and the objective: the decision is made by an \emph{endpoint} cho
 cryptographically authenticated SCION paths, and the objective is the \emph{application's} intent rather than
 a global network utility. Most directly related is the DQN SCION path selector of
 Bourak~et~al.~\cite{Bourak2025}, which we extend; the differences -- a variable-action scoring architecture
-and FiLM-based intent conditioning that removes the single-objective limitation -- are the substance of \cref{ch:single_path}.
+and per-path intent conditioning that removes the single-objective limitation -- are the substance of \cref{ch:single_path}.
 
 \section{Learned Congestion Control and Multipath Scheduling}
 \label{sec:rel:transport}
@@ -60,13 +60,13 @@ the application sends and how it is spread across paths).
 \label{sec:rel:gcrl}
 
 The machinery for serving many objectives with one policy comes from goal-conditioned RL -- universal value
-function approximators~\cite{Schaul2015} and hindsight relabeling~\cite{Andrychowicz2017} -- and from
-conditioning mechanisms such as FiLM~\cite{Perez2018}, originally introduced for visual reasoning. Our
-contribution is not the mechanism but its application and a specific insight about \emph{where} it is
-necessary: for a comparison-based (argmax or softmax) selector, we show conditioning must modulate the
-per-alternative features, because an additive, symmetric signal cancels under the comparison
-(\cref{sec:p1design:film}). This connects a general representation-learning tool to a concrete failure mode
-in networked decision-making.
+function approximators~\cite{Schaul2015} and hindsight relabeling~\cite{Andrychowicz2017}, which learn a
+value function jointly over states and goals. That literature is largely silent on \emph{where} in a
+network the goal should enter, because its policies are not comparison-based. Ours are, and our
+contribution is a specific insight about that gap: for a comparison-based (argmax or softmax) selector,
+conditioning must reach the per-alternative terms, because an additive, symmetric signal cancels under
+the comparison (\cref{sec:p1design:conditioning}). This connects a general representation-learning idea
+to a concrete failure mode in networked decision-making.
 
 \section{Intent-Based Networking}
 \label{sec:rel:ibn}

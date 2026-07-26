@@ -23,13 +23,14 @@ In both formulations, the technical crux is twofold: (i) the objective is dynami
 
 A satisfactory solution must exhibit six key properties, which also define the primary metrics evaluated in subsequent chapters (\cref{ch:single_path,ch:multipath,ch:synthesis}):
 
-\gap{three of the six properties below are currently asserted rather than measured for the single-path
-system. \emph{Zero-Shot Generalization} is never tested: every intent reported in \cref{ch:single_path}
-is one of the reward profiles the agent trained on, and no interpolated or unseen weight vector is ever
-evaluated. \emph{Dynamic-Action Handling} is never tested: results are not broken down by candidate-path
-count $N$. \emph{Structural \& Topological Generalization} is never tested: only one topology exists, and
-the evaluation pairs are drawn from the same pool used for training. Either add the corresponding
-experiments (\cref{sec:sp:eval}) or restate these as design properties rather than evaluated ones.}
+For the single-path system, each of the six is measured rather than asserted:
+\cref{sec:p1eval:intent} for Intent Alignment, \cref{sec:p1eval:zeroshot} for Zero-Shot Generalization,
+and \cref{sec:p1eval:dynamic} for Dynamic-Action Handling, with
+\cref{sec:p1eval:ablation} reporting Structural Generalization on a disjoint set of
+source--destination pairs. One qualification applies throughout: structural generalization is
+demonstrated across pairs and candidate-set sizes within a single topology, since only one topology was
+generated, so generalization across topology \emph{scale} remains a design property rather than an
+evaluated one.
 
 \begin{description}
   \item[Intent Alignment.] The policy must faithfully reflect the specified preference vector $g$. Decisions under $g_{\mathrm{latency}}$ must prioritize low delay, whereas decisions under $g_{\mathrm{throughput}}$ must prioritize goodput. A policy whose action choices remain invariant to changes in $g$ fails this requirement.
