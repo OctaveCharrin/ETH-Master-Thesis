@@ -78,13 +78,72 @@ learning process varies.
 \section{Multipath System: QoE Weights and SAC Hyperparameters}
 \label{app:p2hyper}
 
-The QoE reward of \cref{eq:p2qoe} uses default weights $(a,b,c,d) = (1, 0.5, 0.5, 1)$ with latency and
-jitter normalizers of \SI{200}{\milli\second} and \SI{50}{\milli\second}; the application agent acts every
-\SI{1}{\second} and the transport agent every frame (${\approx}\SI{33}{\milli\second}$ at 30\,fps) over
-a bitrate range of \SIrange{300}{6000}{\kilo\bit\per\second}.
-\gap{tabulate the SAC hyperparameters (network sizes, learning rates, discount, target entropy,
-temperature schedule, replay capacity, batch size) and the exact topology parameters (per-path capacity,
-RTT, cross-traffic intensity) for the static four-path and dynamic six-path scenarios.}
+The QoE reward of \cref{eq:p2qoe} uses base weights $(a,b,c,d,e) = (1, 0.5, 0.5, 1, 0.25)$, overridden
+per intent by \cref{tab:p2profiles}; the application agent acts every \SI{1}{\second} and the transport
+agent every frame (${\approx}\SI{33}{\milli\second}$ at 30\,fps) over a bitrate range of
+\SIrange{300}{6000}{\kilo\bit\per\second}. \Cref{tab:app:p2hyper,tab:app:p2topo} give the learner and
+scenario parameters.
+
+\begin{table}[h]
+  \centering
+  \caption{Soft actor-critic hyperparameters shared by the application and transport agents
+  (\cref{sec:p2impl:agents}). Source: \texttt{rl-mpquic/configs/dynamic.yaml}.}
+  \label{tab:app:p2hyper}
+  \begin{tabular}{ll}
+    \toprule
+    Parameter & Value \\
+    \midrule
+    Hidden layers / width       & 2 / 256 \\
+    Learning rate (Adam)        & $3\times10^{-4}$ \\
+    Discount $\gamma$           & 0.99 \\
+    Target update               & soft (Polyak), $\tau = 0.005$ \\
+    Batch size                  & 256 \\
+    Replay capacity             & $2\times10^{5}$ \\
+    Random warm-up / first update & 1000 / 1000 environment steps \\
+    Temperature $\alpha$        & auto-tuned, target entropy $-d_{\mathrm{act}}$ \\
+    Critic LayerNorm (DroQ)     & enabled \\
+    Updates per environment step & 2 \\
+    Prioritized replay          & enabled \\
+    Episodes $\times$ length    & $100 \times \SI{30}{\second}$ (900~frames) \\
+    Wall-clock per run          & 4--4.5\,h (16-core CPU, no GPU) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[h]
+  \centering
+  \caption{The dynamic six-path scenario (\cref{sec:p2eval:setup}): per-path bottleneck rate,
+  propagation delay, and mean cross-traffic as a fraction of that rate. No path can carry full-quality
+  video alone. Paths~5 and~6 form a shared-bottleneck group that degrades together. Source:
+  \texttt{rl-mpquic/configs/dynamic.yaml}.}
+  \label{tab:app:p2topo}
+  \begin{tabular}{lccl}
+    \toprule
+    Path & Rate & Delay & Character \\
+    \midrule
+    1 & \SI{3.0}{\mega\bit\per\second} & \SI{10}{\milli\second} & clean, low RTT (cross 0.40) \\
+    2 & \SI{2.5}{\mega\bit\per\second} & \SI{15}{\milli\second} & clean (cross 0.45) \\
+    3 & \SI{2.5}{\mega\bit\per\second} & \SI{40}{\milli\second} & latency trap (cross 0.30) \\
+    4 & \SI{2.0}{\mega\bit\per\second} & \SI{20}{\milli\second} & congested (cross 0.55) \\
+    5 & \SI{3.0}{\mega\bit\per\second} & \SI{25}{\milli\second} & shared bottleneck A (cross 0.50) \\
+    6 & \SI{2.5}{\mega\bit\per\second} & \SI{30}{\milli\second} & shared bottleneck B (cross 0.50) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The non-stationary mechanisms are hazards converted per frame from per-second rates. Path churn takes a
+live path down at \SI{0.08}{\per\second} and revives a dead one at \SI{0.30}{\per\second}, with at least
+three of six paths live at all times. Regime shifts resample a path's capacity multiplier uniformly in
+$[0.55, 1.25]$ at \SI{0.20}{\per\second}. Congestion bursts drop capacity to 45\% for
+\SI{0.5}{\second} at \SI{0.10}{\per\second}. The correlated-failure group $\{5, 6\}$ drops to 50\% for
+\SI{1.2}{\second} at \SI{0.05}{\per\second}.
+
+\gap{state the static-scenario topology alongside these once \cref{sec:p2eval:regimes} settles which
+static configuration the chapter reports. Two exist in the implementation and they are not
+interchangeable: an asymmetric three-path topology (8/4/\SI{2}{\mega\bit\per\second}), on which an even
+split overdrives the weakest path and app-only collapses, and a near-equal four-path topology, on which
+app-only comes within 2\% of the full system. The chapter's argument in \cref{sec:p2eval:regimes} turns
+on the difference, so both belong in this table with their headroom spread stated explicitly.}
 
 \section{Supplementary Results}
 \label{app:extra}
@@ -108,4 +167,9 @@ the two probe-frugality profiles of \cref{tab:app:profiles} appear, since \cref{
 excludes them from the conditioning studies.
 
 \gap{two further sets of supplementary plots. (i) Per-intent path-choice distributions for the
-single-path selector. (ii) Representative within-episode split traces for the multipath system.}
+single-path selector. (ii) Multipath training curves --- per-episode QoE, loss, and VMAF for the learned
+pair under each of the three intents --- which are the counterpart of \cref{fig:app:training} and are
+already recorded in the \texttt{history} array of every \texttt{rl-mpquic/runs/*/stats.json}. The
+attention-pool seed collapse discussed in \cref{sec:p2eval:ablation} is visible in those curves and is
+worth showing, since a training curve is the most direct evidence that a training-seed spread is a
+collapse rather than noise.}

@@ -27,14 +27,27 @@ because the objective can then interact with each candidate's own feature values
 wins. This is a design principle, not a SCION-specific trick: any comparison-based selector conditioned
 on an objective must route that objective into its per-alternative terms.
 
-\paragraph{The value of multipath control is a function of volatility.} The central lesson of
-\cref{ch:multipath} is that learned multipath scheduling ranges from nearly worthless to decisive
-depending on the network. In the static scenario, a good bitrate controller over a trivial split captured
-essentially all achievable QoE, and the learned transport agent added little (\cref{sec:p2eval:results}).
-In the dynamic scenario, the same app-only configuration collapsed to negative QoE while the learned split
-sustained a usable call. The practical implication is that one should not evaluate multipath schedulers
-only in stable conditions -- that is precisely the regime in which they look unnecessary -- and that the
-case for learned scheduling rests on volatility, churn, and bursts, where static policies cannot adapt.
+\paragraph{The two decisions are not separable.} The first lesson of \cref{ch:multipath} is the one the
+design was built to test: removing either agent forfeits most of the achievable QoE. An application
+agent over a naive split recovers as little as 39\% of the joint system, and a learned split under a
+conventional bitrate controller as little as 83\%; both hold on the packet-level backend as well as the
+analytical one (\cref{sec:p2eval:ablation}). Rate and split are coupled through the same bottleneck, and
+a controller that fixes either one is optimizing against a constraint it could have moved.
+
+\paragraph{What governs the payoff is headroom, not motion.} The second lesson is a correction to the
+intuition we began with. It is tempting to say that learned multipath scheduling matters when the
+network is volatile, and the correction matters because that framing would misdirect anyone deciding
+whether to deploy it. The governing quantity is the relationship between the load an even split places
+on each path and that path's residual capacity (\cref{sec:p2eval:regimes}). Churn, regime shifts, and
+bursts matter because they destroy that evenness transiently --- but they are not the variable. A
+stationary but \emph{asymmetric} topology defeats application-only adaptation as thoroughly as a
+churning one, while a stationary topology of near-equal paths leaves the scheduler almost nothing to
+earn. Two practical implications follow. One should not benchmark a multipath scheduler on a
+well-balanced topology, stationary or not, because that is the regime in which any allocation works ---
+and, as \cref{sec:p2eval:regimes} shows, the regime in which the measured margin can fall below the
+spread between training runs of the same method, so the benchmark reports its own seed draw. And the
+payoff scales with the application's intent as well as with the network: the stricter the delay budget,
+the less slack there is to absorb a poor allocation, so the more the allocation matters.
 
 \paragraph{One principle, two layers.} Both systems instantiate the Mortise principle~\cite{Shen2026} --
 intent as a first-class input that reshapes a network mechanism -- at successively deeper points of
@@ -60,8 +73,11 @@ that is awkward or impossible in a destination-based Internet.
 \label{sec:disc:limitations}
 
 The results are bounded in ways that the analysis (\cref{ch:analysis}) details and that fairness requires
-restating here. Both systems are evaluated in simulation, and the multipath system's headline
-dynamic-scenario numbers are from the mock backend pending NS-3 confirmation (\cref{sec:p2impl:gaps}).
+restating here. Both systems are evaluated in simulation. The multipath system's headline numbers are
+measured on the analytical mock and confirmed in \emph{ranking} but not in absolute value on the
+packet-level backend (\cref{sec:p2eval:ns3}), on a single training seed; and all of its policies are
+trained on the mock, so what is established is that a mock-trained policy transfers, not that the
+system learns on the realistic body (\cref{sec:p2impl:gaps}).
 The single-path study rests on one topology and one training seed, with a purely temporal train/test
 split, so its quantitative margins should be read as indicative rather than as established effect sizes
 (\cref{sec:p1eval:setup,sec:p1eval:ablation}). Intent in this thesis is \emph{declared}, not
@@ -70,9 +86,9 @@ latent intent from traffic -- a natural but separate problem. The transport mode
 bitrate-dominated, so absolute QoE figures should be read as relative comparisons rather than calibrated
 user scores. Finally, we have not addressed online, safe learning against live traffic, which any
 deployment would require. None of these undercut the two qualitative findings -- conditioning works when
-it reaches the per-alternative comparison and provably cannot when it does not, and multipath control
-pays off in proportion to volatility -- but they do delimit how far the quantitative results should be
-pushed.
+it reaches the per-alternative comparison and provably cannot when it does not, and joint rate-and-split
+control pays off in proportion to how unevenly path capacity is distributed and how strictly the
+application prices delay -- but they do delimit how far the quantitative results should be pushed.
 
 \section{System Analysis}
 \label{ch:analysis}
@@ -107,7 +123,12 @@ ample: timing only the decision itself, over 1280~held-out contexts of 30~candid
 average and under \SI{2}{\milli\second} at the 99th percentile across repeated runs. That is three orders
 of magnitude inside a path-selection budget of seconds to minutes, and comfortably inside a
 \SI{33}{\milli\second} video frame. \gap{report the corresponding measurement for the multipath transport
-agent, whose per-frame budget is the tighter constraint.}
+agent, whose per-frame budget is the tighter constraint. It requires no new experiment: every
+\texttt{evaluation\_results.json} in \texttt{rl-mpquic/runs/} already records per-call decision time for
+both agents, with warm-up calls discarded so the first-call overhead of the tensor library is excluded.
+Report the transport agent's mean and 99th percentile against the \SI{33}{\milli\second} frame budget
+and against the microsecond-scale cost of the heuristic schedulers, and state that it grows linearly in
+the path count, since the shared per-path encoder is evaluated once per candidate.}
 
 \subsection{Scalability}
 \label{sec:analysis:scalability}
@@ -141,12 +162,21 @@ reward goes negative. What remains untested is scale: all of this is one topolog
 \cref{ch:multipath}
 (\cref{sec:p2eval:results}) is itself a generalization stress test, since the policy must cope with churn
 and bursts rather than a stationary environment; the collapse of the fixed-schedule baselines there shows
-that static policies do \emph{not} generalize across volatility, which is the gap learned control fills.
+that a fixed allocation rule does \emph{not} survive a network whose headroom keeps shifting underneath
+it, which is the gap learned control fills.
 For the single-path system, off-distribution degradation is bounded on two of these three axes:
 unseen intents cost nothing measurable (\cref{sec:p1eval:zeroshot}), and unseen pairs and candidate-set
 sizes cost at most about 0.01~reward (\cref{sec:p1eval:dynamic,sec:p1eval:ablation}).
 \gap{quantify the remaining axes -- larger topologies for both systems, and unseen dynamics regimes for
-the multipath system -- to bound how gracefully performance decays there.}
+the multipath system -- to bound how gracefully performance decays there. The multipath half is the
+cheaper of the two and is already set up: two held-out configurations
+(\texttt{rl-mpquic/configs/dynamic\_ood\_\{harsh,mild\}.yaml}) place every hazard rate outside the
+range any policy trained over, and grading existing checkpoints on them is evaluation-only. That run
+also settles the domain-randomization question left open in \cref{sec:p2eval:ablation}: what was
+measured there is randomization's cost on the nominal environment, and these configurations are the
+test of its intended benefit. The two outcomes carry different claims -- ``randomization trades nominal
+performance for robustness'' is a substantially different and more useful finding than ``randomization
+is negative'' -- so this is worth running before either is asserted.}
 
 \section{Deployment Considerations and Trust Assumptions}
 \label{sec:analysis:deployability}

@@ -19,11 +19,15 @@ Multipath QUIC, coupled so that each agent accounts for the other.
 \emph{where} intent is injected matters more than \emph{that} it is injected: for a comparison-based
 selector, a conditioning signal reaching only the terms shared by every candidate leaves decisions
 unchanged, because it cancels under the argmax; the intent has to reach each alternative's own features to
-reorder them. Second, that the value of learned multipath scheduling is
-\emph{not} a fixed quantity but a function of network volatility -- negligible when paths are stable, where a
-good bitrate controller over a trivial split suffices, yet decisive under churn and bursts, where the same
-app-only configuration collapses. Both findings sharpen when, and when not, to reach for the more
-sophisticated mechanism.
+reorder them. Second, that the payoff of joint rate-and-split control is \emph{not} a fixed quantity, and
+that the variable governing it is not the one we expected. It is tempting to say such control matters
+when the network is volatile; what we measured is that it matters when path capacity is unevenly
+distributed relative to what an even split would place on each path, and that churn and bursts matter
+because they destroy that evenness rather than because motion is itself the relevant property. A
+stationary but asymmetric network defeats application-only adaptation as thoroughly as a churning one.
+The payoff also scales with what the application asks for: the stricter its delay budget, the more a poor
+allocation costs. Both findings sharpen when, and when not, to reach for the more sophisticated
+mechanism.
 
 \paragraph{Future work.} Several threads remain open, and much of the draft's structure is deliberately laid
 out to guide them. On the experimental side: adding seed-level statistics and the flat-versus-scoring

@@ -20,8 +20,10 @@ is trained on it. In this environment the axis along which intents genuinely con
 latency -- loss is near zero on 99\% of selections -- so intent alignment is demonstrated there. Second, we ask what happens when several paths are used
 at once and the application is optimized alongside the network: a two-timescale hierarchical pair of
 reinforcement-learning agents co-optimizes a real-time video call's encoding bitrate and its per-path
-traffic split over Multipath QUIC. Here the central finding is that the value of learned multipath
-scheduling depends sharply on network volatility -- nearly negligible when paths are stable, but decisive
-under path churn and congestion bursts, where controlling the application alone collapses. Together the two
+traffic split over Multipath QUIC. Here the central findings are that neither decision can be made well
+alone -- removing either agent loses most of the achievable quality, on both an analytical and a
+packet-level backend -- and that what governs how much the joint controller earns is not whether the
+network is stationary but how unevenly capacity is spread across the paths, and how strictly the
+application prices delay. Together the two
 parts argue that on a path-aware Internet, application intent should steer every controllable decision
 between the application and the wire, and they chart what remains to make such control deployable.
