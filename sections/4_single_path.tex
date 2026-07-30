@@ -43,6 +43,22 @@ framing and gives us a reward structure to build on, but three design choices li
   at one hour is a poor choice at another.
 \end{description}
 
+\gap{reconcile this description of the starting point with the agent that stands in for it, because as
+written the two do not match and the chapter's largest quantitative claim rests on the difference. Here
+Bourak~et~al.\ are described as training a DQN ``to pick a path \emph{from per-path measurements} of
+latency, loss, and bandwidth''. \Cref{sec:p1impl:agents} then implements the Flat DQN as ``a
+conventional fixed-action DQN over the \emph{5-dimensional global state}'' --- day, hour, mean
+utilization, mean trust, and the fraction of loaded paths --- which contains no per-path features at
+all. If that is faithful, say so here and drop the ``per-path measurements'' phrasing. If it is not,
+the 41\% goodput gap and ``the flat architecture is the wrong shape'' are measured against a control
+weaker than the published system, and the honest options are (i) give the flat agent the per-path
+features the original had, keeping only the fixed action head as the difference under test --- which
+is what would actually isolate the architectural claim --- or (ii) relabel it throughout as a
+fixed-action-space control of our own construction rather than a stand-in for prior work, and confine
+the comparison to what it licenses. Option (i) is a small change to an agent that trains in 1--3
+minutes and would make this the cleanest ablation in the thesis; option (ii) costs nothing but
+narrows the claim. Either is defensible; the current pairing is not.}
+
 Our design removes all three: a scoring architecture for the first, per-path intent conditioning for the
 second, and an improved environment for the third. A strawman for the second limitation -- appending the
 reward weights to the state of the existing DQN -- is instructive precisely because of \emph{where} it
@@ -125,6 +141,20 @@ oversubscribed; this is what produces the $>1.0$ abscissa values in \cref{fig:p1
 defensible choices for a study of \emph{selection} -- which path is best is well defined without
 modeling the flow's own back-pressure -- but neither would survive into a closed-loop transport study,
 and \cref{ch:multipath} accordingly uses a different data plane.
+
+\gap{this paragraph is the right qualification in the right place, and it then fails to travel. Every
+later quotation of an absolute goodput --- \SI{8.21}{\giga\bit\per\second} in
+\cref{sec:p1eval:ablation}, the widest-path comparison in \cref{sec:p1eval:overhead}, the
+\SI{9.1}{\giga\bit\per\second}-to-\SI{6.9}{\giga\bit\per\second} descent in
+\cref{sec:p1eval:ceiling}, the 41\% figure in the chapter summary, and the corresponding numbers in
+\cref{sec:intro:contributions} and the abstract --- reads to an uninstructed reader as throughput a
+flow would achieve. It is spare capacity at the bottleneck under a model in which this flow places no
+load. Add a short standing qualifier at first use in each of those places (``residual bottleneck
+capacity, not an achieved rate'') or define the quantity under a distinct name here --- \emph{available
+capacity} rather than goodput --- and use it consistently. The second is cleaner and removes the
+problem at the root, at the cost of a global rename. Note the ceiling figure of
+\cref{sec:p1eval:ceiling} is the one place where the distinction bites hardest, since the whole
+bridging argument to \cref{ch:multipath} is about capacity a single path cannot deliver.}
 
 \paragraph{Does path choice matter here?} The environment is only interesting if the candidate paths of
 a pair differ materially at a given hour, so we measure that spread directly over all 10752~held-out
@@ -519,6 +549,21 @@ axis, which is too little to discriminate between paths, and the two profiles ar
 Balanced by construction. They remain in the training schedule, where they cost nothing and broaden the
 intent space the policy is exposed to, and are excluded from the conditioning studies.
 
+\gap{state the seed protocol for this chapter as plainly as \cref{sec:p2eval:setup} states it for the
+next, because right now the asymmetry is the thesis's own methodological lesson applied to only one
+of its two systems. Five seeds cover \cref{tab:p1eval:seeds} and nothing else: the intent-alignment
+matrix (\cref{tab:p1eval:heatmap}), the zero-shot sweep (\cref{fig:p1eval:zeroshot}), the path-count
+study (\cref{fig:p1eval:pathcount}), the probing comparison (\cref{tab:p1eval:probing}), and the
+ceiling figure (\cref{fig:p1eval:ceiling}) are all read from a single reference run.
+\Cref{sec:p2eval:seeds} identifies exactly that practice as the source of four retractions and says
+the spread over training runs exceeds the evaluation-seed interval by an order of magnitude on this
+class of problem. A reader who takes that lesson seriously will apply it here, and the chapter should
+get there first. Two routes: re-run the five affected results over the five seeds that already exist
+--- these agents train in 1--3 minutes and the checkpoints are on disk, so this is an evaluation-only
+sweep of well under an hour, and it is the cheapest credibility purchase available anywhere in the
+thesis --- or mark each affected claim as single-seed in place. The first is strongly preferable; the
+second is the minimum.}
+
 \paragraph{Metrics.} For each method we report the intent-weighted reward of \cref{eq:p1reward} and the
 achieved per-flow goodput and latency. Intent alignment is assessed two ways: by reward under each
 intent, and by \emph{behavioral divergence} -- the degree to which the chosen path changes as the intent
@@ -599,6 +644,16 @@ under Throughput is 0.74, against 0.03 for the unconditioned scorer and 0.003 fo
 it is not merely worse on average but wildly inconsistent. As \cref{sec:p1impl:agents} establishes,
 this is architectural rather than a training artifact.
 
+None of this is a capacity effect, and the direction it runs in is worth stating because it inverts
+the trade one would expect. The flat agent carries 85.3\,k parameters; the scoring agents carry
+36.2--37.5\,k (\cref{tab:p1eval:ablation}). The architecture that handles a variable path set, serves
+every intent from one set of weights, and lifts goodput by 41\% is \emph{less than half the size} of
+the fixed-action one it replaces --- because a shared per-path scorer is reused across candidates
+where a fixed head must allocate output capacity to each. The dynamic-input design is therefore not
+a flexibility that is paid for in model size; on this problem it is cheaper on both axes at once,
+which is the rare case where the deployability argument and the performance argument point the same
+way.
+
 \paragraph{Where the intent enters decides whether it acts.} Both conditional agents receive the same
 intent vector and both recover strong reward on every intent. The decisive difference is how much they
 \emph{act} on it: Two-Stream-Concat attains an adaptivity of 0.149 and a choice entropy of 0.375~bits
@@ -620,6 +675,18 @@ Two-Stream-Concat's shortfall is 0.0002 on Throughput, 0.0018 on Low-Latency, 0.
 0.0005 on Balanced -- at most \textbf{0.25\%} of the oracle's own reward on any evaluated intent. The
 conditioned selector is thus near-optimal in the strict sense of being close to a per-context $\arg\max$
 that knows every candidate's realized metrics in advance, while itself inspecting one path.
+
+\gap{lead with the absolute shortfalls, which this paragraph already has, and demote the percentage,
+which is a ratio on \cref{eq:p1reward} --- shifted into $[-1,1]$ and then clamped, so its zero is an
+artifact of the shift and 0.25\% of it denotes nothing physical. Then add the sentence that makes the
+result robust rather than merely impressive: state how much room there was. The oracle's own
+adaptivity is 0.161 (\cref{tab:p1eval:ablation}), so in the large majority of contexts no policy could
+have done better under any intent, and three of the four evaluated intents are served by the same
+high-bandwidth paths. ``Near-optimal on a task with little headroom'' is what the data support and it
+is a claim nobody can attack; ``within 0.25\% of the oracle'' invites a reader to ask what fraction of
+contexts were winnable at all, and the chapter should answer that before it is asked. The number ---
+the share of contexts in which the oracle's choice differs from the unconditioned scorer's --- is
+computable from artifacts already on disk.}
 
 \paragraph{Reproducibility across seeds.} Several of the comparisons above are small reward differences,
 so we retrained every agent in the ladder under five random seeds and re-evaluated each on the identical
@@ -1022,6 +1089,22 @@ loss of 24\%. This is the single-path performance ceiling. When the shared bottl
 best available path is still one path, and one path can carry only so much; no amount of intent-aware
 selection recovers capacity that a single path cannot provide. Escaping this ceiling requires spreading a
 flow across several paths at once -- the problem \cref{ch:multipath} takes up.
+
+\gap{this is the thesis's structural bridge and it is currently an argument presented in the register
+of a result. Three things weaken it and all three are fixable in text. (i) The ceiling is measured in
+a model that cannot represent the remedy: the link model is open-loop (\cref{sec:p1design:env}), so a
+multipath flow's own contention is not representable, and nothing in this environment demonstrates
+that splitting recovers any of the lost 24\%. (ii) \Cref{ch:multipath} then answers the question on a
+different data plane with a different topology, different traffic, and a different reward, so no
+quantity crosses the chapter boundary --- the bridge is conceptual, not empirical. (iii) The descent
+is in \emph{residual bottleneck capacity}, not in delivered throughput. Say all three plainly and the
+bridge holds as what it is: a well-motivated argument that the action space, not the policy, is the
+binding constraint, which is exactly what the right panel of \cref{fig:p1eval:ceiling} shows. The
+experiment that would convert it into a result is worth naming even if it is not run: replay the same
+heavy-congestion contexts allowing the flow to be split across the top-$k$ candidates under the same
+link model, and report the aggregate residual capacity available to a split against a single choice.
+It needs no learning and no new environment --- only the existing path store and link states --- and
+it would let this chapter close its own argument rather than deferring it.}
 
 \paragraph{Why the reward does not see the ceiling.} The right panel of \cref{fig:p1eval:ceiling} tells
 the complementary story, and it is worth stating explicitly because a reader who takes the reward as an

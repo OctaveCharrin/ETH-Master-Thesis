@@ -46,6 +46,30 @@ evaluated one.
   \item[Robustness to Network Volatility.] The policy must sustain high performance under non-stationary conditions -- path churn, sudden link failures, and transient congestion bursts -- where static heuristics fail.
 \end{description}
 
+\gap{this last property states as a requirement the thing \cref{sec:p2eval:regimes} and
+\cref{sec:disc:interpretation} explicitly \emph{refute} as the governing variable. The chapter's
+finding is that what decides whether a scheduler has anything to earn is the relationship between the
+load an even split places on each path and that path's residual capacity --- headroom heterogeneity ---
+and that churn, regime shifts, and bursts matter only because they destroy that homogeneity
+transiently. A stationary but asymmetric topology defeats application-only adaptation as thoroughly as
+a churning one, and a stationary near-equal topology leaves the scheduler nothing to do. As written,
+the problem statement sets up an expectation the results correct, and a reader arriving at
+\cref{sec:p2eval:regimes} will read the correction as a retreat rather than as a sharpening. Restate
+the property as robustness to \emph{headroom heterogeneity}, with volatility named as one mechanism
+that produces it. This also makes \cref{ch:problem} the place the thesis's second-most-interesting
+finding is foreshadowed rather than contradicted.}
+
+\gap{the property-to-measurement map above covers the single-path system only --- six properties,
+each pointed at a \cref{ch:single_path} section. Add the multipath column, since \cref{ch:multipath}
+measures five of the six and the reader has no index into them: Intent Alignment
+(\cref{sec:p2eval:transfer,sec:p2eval:conditioning}), Zero-Shot Generalization
+(\cref{sec:p2eval:conditioning}, with the caveat that interior intents are in-distribution there),
+Dynamic-Action Handling (\cref{sec:p2eval:ablation}'s flat-versus-scoring arm), Structural
+Generalization (the held-out dynamics arms), and Robustness (\cref{sec:p2eval:regimes}). Mark the one
+that is \emph{not} measured for the multipath system --- Low Overhead, whose per-frame inference cost
+is the binding real-time constraint of the entire design and is unstated in both chapters
+(\cref{sec:analysis:overhead}) --- so the omission is declared here rather than discovered.}
+
 \section{Assumptions \& Scope}
 \label{sec:problem:assumptions}
 

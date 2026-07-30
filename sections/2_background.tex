@@ -63,6 +63,18 @@ interactivity adds extreme sensitivity to end-to-end latency, jitter, and frame 
 call is effectively a lost frame. Our multipath reward composes a VMAF-based quality term with penalties for 
 latency, jitter, and loss, making the QoE objective explicit and tunable.
 
+\gap{two pieces of background this section owes \cref{ch:multipath} and does not supply. (i)
+\emph{Google Congestion Control and the WebRTC stack}: GCC is the bitrate estimator behind both the
+\texttt{webrtc} baseline --- the strongest hand-written policy in \cref{tab:p2results} and the one every
+headline margin is quoted against --- and the \texttt{path-only} ablation, yet the reader first meets it
+in an evaluation table with no introduction. A paragraph on how GCC estimates available bandwidth from
+delay gradients and loss is what lets a reader judge whether beating it by 11--21\% is impressive.
+(ii) \emph{The ITU-T ladder}: \cref{tab:p2profiles} keys its three intents to G.1010 use-case classes,
+anchors its delay weights on G.114, its jitter normalizer on Y.1541 class-0 IPDV, and fits $(b,d)$
+against a G.1070 opinion model. Four standards carry the reward's provenance and none is introduced
+here. This background is also what makes the reward-calibration gap at \cref{tab:p2profiles} land as a
+methodological contribution rather than a hyperparameter note.}
+
 \subsection{Adaptive bitrate and learned control}
 The application-side lever in joint control is adaptive bitrate (ABR) control: choosing the video encoder's
 target rate to match available capacity. Learned ABR controllers such as Pensieve~\cite{Mao2017}
@@ -138,8 +150,23 @@ so that a single neural network represents a whole family of behaviors. Universa
 (UVFAs)~\cite{Schaul2015} formalize this by learning $V(s, g)$ jointly over states and goals, while hindsight 
 experience replay~\cite{Andrychowicz2017} improves sample efficiency by relabeling trajectories with goals 
 achieved \emph{a posteriori}. In this thesis, the ``goal'' represents application intent,
-encoded as a vector of reward weights: the agent is explicitly told how much it should prioritize throughput 
+encoded as a vector of reward weights: the agent is explicitly told how much it should prioritize throughput
 versus latency, jitter, loss, or trust, and is expected to adapt its decisions dynamically.
+
+\gap{this subsection reaches for UVFAs and hindsight relabeling and misses the literature that is
+actually about what this thesis does. Conditioning a policy on a vector of \emph{reward weights} and
+expecting it to span the induced family of optima is \textbf{multi-objective reinforcement learning},
+not general goal-conditioning: the goal here is a preference over a scalarization, not a target state,
+and HER --- which relabels with achieved goals --- does not even apply to it. The MORL literature on
+weight-conditioned value functions covers exactly this construction and is not cited once, here or in
+\cref{sec:rel:gcrl}. This is the most conspicuous citation hole in the thesis and the first thing a
+reviewer from the learning side will find. Add a paragraph placing the thesis's intent vector as a
+preference weighting over a linear scalarization, note what MORL already establishes (one network can
+represent the whole Pareto front over a weight simplex), and be explicit about the delta this thesis
+claims on top of it, which is real and narrow: MORL policies are not comparison-based, so nothing in
+that literature addresses \emph{where} in a scoring architecture the weights must enter ---
+which is the entire content of \cref{prop:p1cancel}. Stating that boundary strengthens the
+contribution; omitting the literature makes it look unaware of it.}
 
 \subsection{Where the conditioning signal enters}
 \emph{Where} the goal vector enters the network is as consequential as whether it is supplied at all, and

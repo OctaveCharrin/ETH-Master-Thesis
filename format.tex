@@ -85,7 +85,8 @@
 %
 % Draft helpers: visible open-question callouts and placeholder floats.
 % Remove (or redefine \gap as \relax) once the draft is complete.
-\newcommand{\gap}[1]{\textcolor{eth7}{\textbf{[TODO:~}\textit{#1}\textbf{]}}}
+% \long so that a gap may span paragraphs; \textcolor is short and would fail on a blank line.
+\long\def\gap#1{{\color{eth7}\textbf{[TODO:~}{\itshape#1}\textbf{]}}}
 \newcommand{\placeholderfig}[1]{%
     \begin{center}
     \fcolorbox{eth7}{white}{\parbox[c][3cm][c]{0.9\linewidth}{\centering\itshape

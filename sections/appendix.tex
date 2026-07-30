@@ -138,6 +138,20 @@ $[0.55, 1.25]$ at \SI{0.20}{\per\second}. Congestion bursts drop capacity to 45\
 \SI{0.5}{\second} at \SI{0.10}{\per\second}. The correlated-failure group $\{5, 6\}$ drops to 50\% for
 \SI{1.2}{\second} at \SI{0.05}{\per\second}.
 
+\paragraph{Intent conditioning.} The conditioned agents of \cref{sec:p2eval:conditioning} append a
+five-component intent vector to the observation: the delay, jitter, and loss weights $(b, c, d/2)$ of
+\cref{eq:p2qoe}, the frame deadline, and the latency normalizer, the last two scaled by
+\SI{800}{\milli\second}. The existing observation features are left untouched and the normalizer is
+disclosed as an input rather than fixed across intents, which is what keeps the per-intent specialists
+of \cref{tab:p2transfer} a valid baseline against the conditioned policy --- and is also the third of
+the three premise violations reported in \cref{sec:p2design:cancel}, since that normalizer divides a
+per-path feature. Two conditioning modes are compared: \texttt{global}, which supplies the vector to the
+global context slot alone, and \texttt{perpath}, which additionally broadcasts it to every per-path
+feature row, adding $5 \times 6 = 30$ input dimensions. Training randomizes the intent per episode,
+stratified over the three anchors of \cref{tab:p2profiles} plus a continuously sampled interior; the
+randomization is training-only and evaluation never resamples. Both arms are trained for six seeds at the
+budget of \cref{tab:app:p2hyper}. Source: \texttt{rl-mpquic/configs/dynamic\_intent\{,\_glob\}.yaml}.
+
 \gap{state the static-scenario topology alongside these once \cref{sec:p2eval:regimes} settles which
 static configuration the chapter reports. Two exist in the implementation and they are not
 interchangeable: an asymmetric three-path topology (8/4/\SI{2}{\mega\bit\per\second}), on which an even
@@ -173,3 +187,19 @@ already recorded in the \texttt{history} array of every \texttt{rl-mpquic/runs/*
 attention-pool seed collapse discussed in \cref{sec:p2eval:ablation} is visible in those curves and is
 worth showing, since a training curve is the most direct evidence that a training-seed spread is a
 collapse rather than noise.}
+
+\section{Code and Artifact Availability}
+\label{app:artifacts}
+
+\gap{write this section, which the thesis currently lacks entirely. \Cref{ch:multipath}'s tables are
+scrupulous about citing the artifact behind every number --- \texttt{rl-mpquic/runs/ab-prof2-ev*-tr*/\allowbreak
+ab\_summary.json} and its siblings appear in six captions --- and there is nowhere in the document
+that says where \texttt{rl-mpquic} \emph{is}. State the repository and the commit hash that produced
+the reported results, the same for the single-path codebase, and the software versions that matter
+(Python, PyTorch, NS-3 and ns3-ai). Then give the mapping from each table and figure to the run
+directory backing it; the material already exists in \texttt{rl-mpquic/docs/RESULTS.md}, which is
+organized exactly this way, so this is a transcription rather than an authoring task. Note also which
+results cannot be reproduced from the artifacts alone --- the NS-3 arms need a built simulator, and
+the checkpoints are not in version control --- so the claim made here is accurate. Both examiners and
+anyone building on this will look for this section first; its absence is the kind of thing that reads
+as carelessness in a document that is otherwise unusually careful about provenance.}
