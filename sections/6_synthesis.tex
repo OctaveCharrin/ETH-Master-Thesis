@@ -268,9 +268,10 @@ Generalization is required along three axes. \textbf{Across intents:} the condit
 \cref{ch:single_path} is meant to interpolate to intents between (and, ideally, beyond) the trained reward
 profiles, so that a novel weight vector yields sensible behavior without retraining.
 \Cref{sec:p1eval:zeroshot} confirms it: sweeping the intent along the segment between two trained
-profiles moves the chosen path's latency monotonically, with a Spearman correlation of $-1.000$ and no
-single step carrying more than a quarter of the span, and modest extrapolation beyond both endpoints
-continues the trend. The multipath conditioning generalizes along the same axis but with a weaker
+profiles moves the chosen path's latency down smoothly and, in four of five training seeds, strictly
+monotonically (Spearman $-1.000$; the fifth seed has one ascending step of \SI{0.036}{\milli\second}, for
+$-0.991$), with no seed carrying more than 31\% of the span in a single step, and modest extrapolation
+beyond both endpoints continues the trend. The multipath conditioning generalizes along the same axis but with a weaker
 warrant: sweeping the intent between two profiles moves bitrate and quality smoothly and monotonically,
 by 11--24 times the span a non-learning control shows over the same rollouts, but training there sampled
 the intent space continuously, so the interior of the segment is in-distribution rather than unseen
@@ -282,8 +283,9 @@ tightening it beyond the trained range collapses it -- which is the expected dir
 asks for a deadline below what the network can deliver rather than merely an unfamiliar one.
 \textbf{Across topologies and path counts:} the permutation-equivariant design gives
 structural generalization, and \cref{sec:p1eval:dynamic} confirms both halves of it empirically -- exact
-order invariance over 32256~permutation trials, and regret held two orders of magnitude below the
-fixed-action agent across a 15-fold range in candidate count. \Cref{sec:p1eval:ablation} adds a
+order invariance over all 483840~permutation trials, across three agents and five training seeds with
+zero mismatches, and regret held two orders of magnitude below the fixed-action agent across a 15-fold
+range in candidate count. \Cref{sec:p1eval:ablation} adds a
 structurally disjoint set of 32~pairs spanning 32~source ASes never visited in training, on which the
 conditioned selector's optimality gap grows only from 0.0018 to 0.0033 while the flat agent's Throughput
 reward goes negative. What remains untested is scale: all of this is one topology of 90~ASes.

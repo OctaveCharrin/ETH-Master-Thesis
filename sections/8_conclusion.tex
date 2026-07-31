@@ -63,11 +63,16 @@ such conditioning can be worth at all: it is cheap
 and it costs nothing to add, but it earns something only where the objectives genuinely conflict and
 there is headroom to exploit, and neither of our environments offered much of either.
 
-A fourth lesson is about method rather than mechanism, and we learned it the expensive way. Five results
-in this thesis looked clean at one sampling of the training seed and did not survive a larger one --- four
-of them reported from a single training run and retracted at three, one of them surviving three and six
-seeds on its pooled statistic and failing when that statistic was decomposed per seed ---
-because on this problem the spread between training runs exceeds the confidence interval over evaluation
+A fourth lesson is about method rather than mechanism, and we learned it the expensive way, in both
+systems. Ten results in this thesis looked clean at one sampling of the training seed and did not survive
+a larger one. Five are in \cref{ch:multipath} --- four reported from a single training run and retracted
+at three, one surviving three and six seeds on its pooled statistic and failing when that statistic was
+decomposed per seed --- and five more in \cref{ch:single_path}, found by applying the same rule to the
+chapter that had motivated it (\cref{sec:p1eval:limits}). The single-path five are milder: no mechanism
+broke, and what fell was the exactness of three claims and the third decimal of two others read off a
+favorable run. That the same failure appears in both systems, at different severities, is what makes it a
+property of the method rather than of one experiment. The cause is the same in both:
+on this problem the spread between training runs exceeds the confidence interval over evaluation
 episodes by an order of magnitude. Sampling training seeds is necessary and not sufficient: a cheap
 simulator can be faithful enough to train good policies in while being uncorrelated with the realistic
 body on which of them is good. Nor is it sufficient to sample seeds and then pool over them: a summary
@@ -82,8 +87,7 @@ raises: whether the system \emph{learns} on the packet-level body rather than me
 which matters more now that we know surrogate score does not predict packet-level rank. Two native
 training seeds are complete and both learn; a third is what would put the answer on the same evidential
 footing as the rest of the chapter. Alongside it,
-extending the seed-level statistics of \cref{ch:multipath} back to the single-path study, which still
-rests on one training seed, and testing both systems on topologies larger than those they trained on ---
+testing both systems on topologies larger than those they trained on ---
 the path-count axis of that question is now measured and the topology-size axis is not. On
 the system side: replacing the TCP-like subflows with a real Multipath QUIC transport, and enriching the
 VMAF surrogate so quality responds to delivery conditions and not just bitrate -- a change that would also

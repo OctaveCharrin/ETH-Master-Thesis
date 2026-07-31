@@ -25,9 +25,9 @@ fixed-dimension head costs 0.231 QoE and drops the system from first place in ni
 cells to none, which makes it the largest measured effect in this thesis, and the substitute cannot even
 be loaded at a path count other than the one it trained on, where the shared-weight policy runs
 unmodified from two paths to twelve at a parameter count that does not move. The same
-architecture carries the single-path study, where it raises goodput by 41\% over a fixed-action agent
-at less than half the parameter count, and brings a learned selector within 0.25\% of a per-context
-oracle while probing one path per decision instead of thirty.
+architecture carries the single-path study, where it raises residual bottleneck capacity by 41\% over a
+fixed-action control at less than half the parameter count, and brings a learned selector to within
+0.002 reward of a per-context oracle while probing one path per decision instead of thirty.
 
 Intent conditioning is the thread that connects the two, and its honest form is a design lemma with a
 measured boundary. We show analytically that \emph{where} the conditioning enters decides whether it

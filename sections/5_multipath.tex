@@ -1372,7 +1372,7 @@ of the methodological point of \cref{sec:p2eval:setup}, caught in our own data.
 
 \paragraph{Permutation equivariance holds to float32 precision on trained policies.} The scoring head
 is permutation-equivariant by construction, and \cref{ch:single_path} backs its discrete counterpart
-with a 32256-trial invariance test rather than an assertion. The same measurement here: three trained
+with a 483840-trial invariance test rather than an assertion. The same measurement here: three trained
 checkpoints $\times$ 200 on-distribution decision contexts $\times$ 60 random permutations, for
 \textbf{36{,}000 trials}. Permutations are drawn over the whole path set, so the liveness mask is
 carried along with the rows --- the case that matters under churn, and the one a fixed-slot
