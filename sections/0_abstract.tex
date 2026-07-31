@@ -15,17 +15,19 @@ has been taken before.
 
 The strongest result is that the two decisions cannot be made well apart. A two-timescale pair of
 reinforcement-learning agents co-optimizing a video call's encoding bitrate and its per-path split over
-Multipath QUIC beats all seven comparison points under all three application intents, including a
-WebRTC-style deployed stack, by 0.065 to 0.143 QoE -- three to seven times the spread between training
-runs of the same method -- and removing either agent forfeits most of the achievable quality. What makes
+Multipath QUIC beats all eight comparison points under all three application intents -- including
+minRTT, the scheduler every Multipath QUIC implementation ships, and a WebRTC-style deployed stack --
+by 0.065 to 0.143 QoE over the strongest of them, three to seven times the spread between training
+runs of the same method, and removing either agent forfeits most of the achievable quality. What makes
 this possible is architectural rather than incidental: a permutation-equivariant head that scores each
 path with shared weights, so one policy serves any number of paths. Substituting a conventional
 fixed-dimension head costs 0.231 QoE and drops the system from first place in nine of nine evaluation
-cells to none, which makes it the largest measured effect in this thesis and inverts the usual trade,
-since the dynamic-input design is also less than half the size of the fixed one it replaces. The same
+cells to none, which makes it the largest measured effect in this thesis, and the substitute cannot even
+be loaded at a path count other than the one it trained on, where the shared-weight policy runs
+unmodified from two paths to twelve at a parameter count that does not move. The same
 architecture carries the single-path study, where it raises goodput by 41\% over a fixed-action agent
-and brings a learned selector within 0.25\% of a per-context oracle while probing one path per decision
-instead of thirty.
+at less than half the parameter count, and brings a learned selector within 0.25\% of a per-context
+oracle while probing one path per decision instead of thirty.
 
 Intent conditioning is the thread that connects the two, and its honest form is a design lemma with a
 measured boundary. We show analytically that \emph{where} the conditioning enters decides whether it
@@ -46,7 +48,10 @@ as the one axis on which alignment can be demonstrated.
 We report where the results do not reach, and two of those findings are more useful than what they
 replaced. What governs the payoff of joint control is not whether the network is moving but how
 unevenly capacity is spread across the paths and how strictly the application prices delay -- a
-stationary but asymmetric network defeats application-only adaptation as thoroughly as a churning one.
+stationary but asymmetric network defeats application-only adaptation as thoroughly as a churning one,
+and the two axes interact rather than adding, the three intents differing fourteen times more on a harsh
+network than on a benign one. The same map bounds the headline claim: it holds on a milder held-out
+network and fails on a harsher one, where a hand-written scheduler wins every column.
 And on a packet-level backend the ranking transfers for three of six independently trained policies and
 not the other three, with analytical-backend score uncorrelated with which, so a cheap surrogate can be
 an adequate training environment while being useless for selecting among the policies it produces. Four

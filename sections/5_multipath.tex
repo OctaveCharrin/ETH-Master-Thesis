@@ -29,7 +29,8 @@ halves --- is consequently untested, which is the honest form of the future-work
 Three findings organize the chapter. Neither decision can be made well alone: removing either agent
 forfeits most of the achievable quality. The value of making them jointly is governed not by whether the
 network is moving but by how unevenly capacity is distributed across the paths and by how strictly the
-application prices delay. And a \emph{single} policy conditioned on the application's intent does the
+application prices delay --- two axes that turn out to interact rather than add, and that together bound
+where the system's advantage exists at all. And a \emph{single} policy conditioned on the application's intent does the
 work of three separately trained specialists, which is where this chapter rejoins the thesis's central
 claim -- and where it also finds that claim's sharpest limit, since the conditioning result comes with a
 proposition whose premise the deployed architecture measurably violates.
@@ -366,12 +367,23 @@ the affected subflow; regime, burst, and correlation scale the bottleneck rate a
 rate together. Behavioral parity between the two bodies is checked by a fixed-policy loss-regime guard
 (\texttt{rl-mpquic/scripts/parity\_check.py}).
 
-\gap{report the parity check as a result rather than leaving it as a build step, and state the two
-places the bodies are deliberately not identical: they draw from independent random streams, so they are
-behaviorally equivalent rather than frame-identical, and the mock's sender queue is unbounded where
-NS-3's is not. The second asymmetry is not cosmetic -- it is why the mock's failure model is optimistic,
-and it is the mechanism behind the \texttt{single} baseline inverting between the two bodies
-(\cref{tab:p2ns3}). \texttt{rl-mpquic/docs/TUNING\_DYNAMICS.md} \S4 lists the structural differences.}
+\paragraph{Parity between the bodies, and what it does and does not say.} Driving both backends with the
+same neutral policy --- an even split at a fixed \SI{1500}{\kilo\bit\per\second}, no agents --- puts them
+in the same loss regime: mean per-frame loss is 0.148 on the mock against 0.190 on NS-3 with TCP
+subflows and 0.200 with UDP, and no configuration expires more than 1.6\% of frames. Parity is
+\emph{behavioral} rather than frame-identical by design, because the two bodies draw from independent
+random streams, so the guard is a band (a gap under 0.15) and not an equality. The bodies are also
+deliberately not identical in one way that matters: the mock's sender queue is unbounded where NS-3's is
+not, which is why the mock's failure model is optimistic and is the mechanism behind the \texttt{single}
+baseline inverting between them (\cref{tab:p2ns3}).
+
+Decomposing by mechanism sharpens what ``four non-stationary mechanisms'' should be taken to mean. Run
+one at a time on NS-3, \emph{churn alone} produces essentially all of the loss (0.219), while regime
+shifts alone and congestion bursts alone each produce \textbf{0.000}. They reduce capacity, but at this
+offered rate not below what an even split demands, so they bite only in combination or under a policy
+driving a higher bitrate. The scenario's difficulty under a neutral policy is therefore a churn
+phenomenon; the other three mechanisms shape what a \emph{rate-adaptive} controller experiences rather
+than what a fixed one does.
 
 \subsection{Real-Time Video and Multipath Model}
 \label{sec:p2impl:rt}
@@ -421,9 +433,12 @@ follow-up work.
   activate those axes and let quality respond to delivery conditions directly. Every result in
   \cref{sec:mp:eval} therefore uses the bitrate-only logarithmic curve.
   \item \textbf{Training body.} All reported policies are trained on the mock backend and evaluated on
-  both. Whether a mock-trained policy transfers is measured, and the answer is that it depends on the
-  training seed in a way mock evaluation cannot predict (\cref{sec:p2eval:ns3}); that the system
-  \emph{learns} on the packet-level body is not yet established.
+  both, because an NS-3-native training seed costs ${\approx}$\,25\,h against the mock's
+  ${\approx}$\,1.5\,h and NS-3 runs cannot be parallelized (\cref{sec:p2eval:ns3}). Whether a
+  mock-trained policy transfers is measured, and the answer is that it depends on the training seed in a
+  way mock evaluation cannot predict; that the system \emph{learns} on the packet-level body is
+  supported by two completed NS-3-native seeds but not established, since two is below the three-seed
+  floor this chapter applies elsewhere.
   \item \textbf{Episode independence.} Episodes reset in-band to keep the shared-memory bridge alive,
   which leaves congestion state warm across resets, so episodes are not independent draws.
 \end{itemize}
@@ -436,32 +451,23 @@ policy unchanged -- would convert it into a measurement, and it costs one evalua
 \section{Experimental Evaluation: Regimes of Value}
 \label{sec:mp:eval}
 
-This section evaluates the multipath system and answers six questions in turn.
-\Cref{sec:p2eval:setup} fixes the setup, the eight comparison points, and the statistical protocol.
+This section evaluates the multipath system and answers seven questions in turn.
+\Cref{sec:p2eval:setup} fixes the setup, the nine policies compared, and the statistical protocol.
 \Cref{sec:p2eval:results} asks whether the learned pair beats every baseline, and under which
 application intents. \Cref{sec:p2eval:regimes} asks the question the chapter is named for --
 \emph{when} does learned scheduling earn its keep -- and answers it with a mechanism rather than a
 scenario label. \Cref{sec:p2eval:transfer} asks whether the three intents produce genuinely different
 policies or merely relabel the reward, and \cref{sec:p2eval:conditioning} asks the thesis's own
 question of this system: whether one policy conditioned on the intent can replace the three that bake it
-in. \Cref{sec:p2eval:ns3} asks whether any of it survives on a packet-level transport stack, and
+in. \Cref{sec:p2eval:ns3} asks whether any of it survives on a packet-level transport stack,
 \cref{sec:p2eval:ablation} isolates the individual design choices, including the ones that did not pay
-off. \Cref{sec:p2eval:seeds} draws together what the section's four retractions have in common, which is
-a result in its own right.
+off, and \cref{sec:p2eval:pathcount} asks whether the architecture's central promise --- one policy for
+any path count --- holds when it is measured rather than asserted. \Cref{sec:p2eval:seeds} draws
+together what the section's retractions have in common, which is a result in its own right.
 
-\gap{this chapter has \textbf{no figures} --- zero against \cref{ch:single_path}'s six, in the chapter
-the thesis calls its core. It is the most visible deficiency in the document and the cheapest to fix:
-nothing below needs a new training run, because \texttt{-\/-figures} was simply never passed on any
-current evaluation and \texttt{rl-mpquic/evaluation/generate\_figures.py} renders from any stored
-\texttt{evaluation\_results.json}. Six are specified in \texttt{rl-mpquic/docs/THESIS\_BRIEF.md} \S9;
-in priority order they are the within-episode split trace (the chapter's mechanism claim, currently
-asserted in prose --- see the gap at \cref{sec:p2eval:results}), a grouped bar chart replacing
-\cref{tab:p2results}, the intent sweep of \cref{sec:p2eval:conditioning} as the counterpart to
-\cref{fig:p1eval:zeroshot}, the decision-time distribution that closes the overhead gap in
-\cref{sec:analysis:overhead}, per-intent training curves for the appendix, and the two-dimensional
-regime map of \cref{sec:p2eval:regimes}. All but the last are evaluation-only against checkpoints
-already on disk and total well under an hour. Name them \texttt{p2eval\_*}/\texttt{p2app\_*} to match
-\cref{ch:single_path}'s convention.}
+Every figure in this section is rendered from evaluation runs against checkpoints already on disk; no
+result below required a training run except the one conditioning arm of \cref{sec:p2eval:conditioning}
+that is identified as such.
 
 \subsection{Setup, Baselines, and Statistical Protocol}
 \label{sec:p2eval:setup}
@@ -477,29 +483,30 @@ evaluated; we also report the underlying achieved bitrate, latency, loss, and VM
 carries its own reward, QoE is comparable \emph{within} an intent and never across intents --- all
 comparisons below are read down a column.
 
-\paragraph{Baselines and ablations.} Eight policies are compared. Four are fixed scheduling rules
+\paragraph{Baselines and ablations.} Nine policies are compared. Five are fixed scheduling rules
 driving a common reactive bitrate controller, so that the comparison isolates \emph{scheduling}:
 \emph{even} split over live paths, \emph{single} highest-throughput path, \emph{proportional} allocation
-by recent per-path throughput, and \emph{random} (a fresh Dirichlet draw per frame). Under dynamics all
-four are mask-aware, operating only over active paths, so they are not handicapped by churn they cannot
-see. A fifth, \emph{WebRTC}, is the strongest external comparison point: a stateful Google Congestion
-Control bitrate estimator driving a proportional split, i.e.\ what a deployed real-time video stack does
-today. Two ablations decompose the learned pair itself: \emph{app-only} keeps the learned bitrate
+by recent per-path throughput, \emph{random} (a fresh Dirichlet draw per frame), and \emph{minRTT}, the
+default scheduler in essentially every Multipath TCP and Multipath QUIC implementation. Under dynamics
+all five are mask-aware, operating only over active paths, so they are not handicapped by churn they
+cannot see. minRTT is included because the other four are rules we wrote, and a learned scheduler should
+be measured against the rule the field actually deploys: it fills paths greedily in ascending smoothed
+RTT, each up to its congestion window, which is the per-frame form of the reference packet-level rule.
+Collapsing it to ``send everything on the lowest-RTT path'' would make it a relabelled \emph{single} and
+would understate it, since real minRTT spreads once a window binds. A sixth, \emph{WebRTC}, is the
+strongest external comparison point: a stateful Google Congestion Control bitrate estimator driving a
+proportional split, i.e.\ what a deployed real-time video stack does today. Two ablations decompose the learned pair itself: \emph{app-only} keeps the learned bitrate
 controller and replaces the transport agent with an even split, and \emph{path-only} keeps the learned
 split and replaces the application agent with the same GCC estimator. Together the two ablations answer
 which half of the hierarchy carries the result.
 
-\gap{no MPQUIC-native scheduler appears among the eight comparison points, and this is the first thing
-a transport reviewer will look for. \emph{minRTT} is the default scheduler in essentially every
-Multipath TCP and Multipath QUIC implementation, and BLEST and ECF are the standard research
-comparisons that a paper on learned multipath scheduling is expected to beat; \emph{proportional}
-allocation by recent throughput is not a substitute for any of them, because none of them allocates
-proportionally. minRTT in particular is nearly free to add: it is a fixed rule over the smoothed RTT
-already present in the per-path observation, it needs no training, and it slots into the same
-fixed-rule harness as \emph{even} and \emph{proportional}. Adding it converts ``beats the rules we
-wrote'' into ``beats the rule the field actually deploys''. If it is not added, state its absence
-explicitly here as a limitation rather than leaving the comparison set to speak for itself, and note
-in \cref{sec:rel:transport} that ReLeS and Peekaboo are discussed but not compared against.}
+\gap{minRTT is now in the comparison set; BLEST and ECF are not. They are the standard research
+refinements of minRTT --- both address its head-of-line-blocking failure mode by predicting whether a
+slower path will delay completion --- and a paper on learned multipath scheduling would be expected to
+compare against them. Both are fixed rules over quantities already in the observation, so neither is
+expensive, but each needs its own send-time model to be implemented faithfully rather than guessed.
+State their absence here if they are not added, and note in \cref{sec:rel:transport} that ReLeS and
+Peekaboo are discussed but not compared against.}
 
 \paragraph{Statistical protocol.} Every comparison is graded over a grid of training checkpoints
 $\times$ evaluation seeds, five episodes per cell, with all policies seeing identical conditions within
@@ -521,10 +528,10 @@ and in both directions'' when the seed count doubles. None of that undermines th
 deliberately conservative, it is the right instinct, and adopting it is what caught four bad results.
 It should be presented that way --- a stated, conservative screening heuristic with a known weakness
 --- rather than as a statistic, because a reader who mistakes it for one will correctly object that
-$n = 3$ supports no such inference. Two additions make it checkable rather than authoritative: give
-per-seed means for the headline arms, as \cref{tab:p2seeds} already does for the transfer experiment,
-so a reader can apply their own threshold; and state the minimum detectable effect this design
-achieves, which is the number \cref{sec:p2eval:conditioning}'s parity claim silently depends on.}
+$n = 3$ supports no such inference. One addition still makes it checkable rather than authoritative:
+give per-seed means for the headline arms, as \cref{tab:p2seeds} already does for the transfer
+experiment, so a reader can apply their own threshold. The minimum detectable effect this design
+achieves is now reported in \cref{sec:p2eval:conditioning} and should be cross-referenced from here.}
 
 \subsection{Does the Learned Pair Win, and Under Which Intent?}
 \label{sec:p2eval:results}
@@ -547,6 +554,7 @@ achieves, which is the number \cref{sec:p2eval:conditioning}'s parity claim sile
     Learned pair              & \textbf{0.635} [0.019] & \textbf{0.719} [0.018] & \textbf{0.810} [0.023] \\
     Path-only (GCC rate), \emph{ablation} & 0.574 [0.000] & 0.607 [0.009] & 0.677 [0.006] \\
     WebRTC (GCC + proportional) & 0.570 & 0.601 & 0.667 \\
+    minRTT (MPQUIC default)   & 0.496 & 0.534 & 0.559 \\
     Single best-active path   & 0.456 & 0.496 & 0.512 \\
     App-only (learned rate, even split), \emph{ablation} & 0.220 [0.044] & 0.441 [0.033] & 0.682 [0.018] \\
     Proportional              & 0.238 & 0.275 & 0.332 \\
@@ -563,7 +571,9 @@ than a baseline, it is 10.7\%, 18.4\%, and 19.6\%. Every one of those margins cl
 spread in its column several times over, and the ranking is stable per cell as well as on the mean:
 the learned pair is first in all nine evaluation cells under \texttt{presenter} and \texttt{passive} and
 in eight of nine under \texttt{interactive}, where the path-only ablation takes one cell. This is the
-best-evidenced claim in the chapter.
+best-evidenced claim in the chapter. It is also bounded by the distribution it was trained on, and
+\cref{sec:p2eval:regimes} measures that bound directly: the claim survives intact on a \emph{milder}
+held-out network and fails on a harsher one.
 
 \gap{the evidence here is the strongest in the thesis and the way it is quoted is the weakest part of
 it. ``11.5\%, 19.8\%, and 21.4\%'' are ratios taken on \cref{eq:p2qoe}, a composite of a quality term
@@ -584,10 +594,23 @@ spread''. They are not. Against the spreads in \cref{tab:p2results} the ratios a
 $0.065/0.019 = 3.4\times$, $0.118/0.018 = 6.6\times$ and $0.143/0.023 = 6.2\times$ --- comfortably
 significant under this chapter's own decision rule, but three to seven times rather than ten. The
 claim never needed the exaggeration and is stronger without it, since any reader who checks the
-arithmetic against the table will find it. Sweep the chapter for other uses of ``order of magnitude''
-and verify each against its table. Note the phrase \emph{is} used correctly in
+arithmetic against the table will find it. The rest of the chapter has been swept: the only other
+questionable use was of the flat-head effect in \cref{sec:p2eval:ablation}, now quoted as six to
+eighteen times its spreads, and the phrase \emph{is} used correctly in
 \cref{sec:p2eval:seeds}, of the ratio between evaluation-seed intervals and training-seed spread,
 which genuinely is tenfold.}
+
+\emph{minRTT}, the rule the field actually deploys, lands fourth: 0.496, 0.534, and 0.559, so the
+learned pair leads it by $+0.139$, $+0.185$, and $+0.250$ --- seven to eleven times the training-seed
+spread, and the largest margin over any comparison point that is not one of our own ablations.
+Two things about where it lands are worth stating, because both cut against us and neither changes the
+verdict. It is \emph{the strongest of the five fixed scheduling rules}, beating \emph{single} by
+0.038--0.048 and \emph{proportional} by 0.227--0.259 under a common bitrate driver, so the previous best
+fixed rule in this table was one of our own construction and the comparison is now against a better
+opponent. And it is nonetheless beaten by \emph{WebRTC}, which remains the strongest hand-written
+policy here --- the two differ in their bitrate controller rather than their scheduler, which is the
+honest reading: on this scenario the rate half matters more than the split half for a non-learning
+system.
 
 The distinction between the two margins is worth keeping straight, because the literature's question and
 the design's question are different. Against what a deployed real-time video stack does today ---
@@ -597,22 +620,35 @@ worth 11--20\%, which is a statement about the application half of the hierarchy
 system as a whole. \Cref{sec:p2eval:ablation} decomposes it properly.
 
 The policies also \emph{behave} differently under different intents, which is what the intent mechanism
-is for. Delivered latency rises from \SI{49.0}{\milli\second} (\texttt{interactive}) to
-\SI{57.6}{\milli\second} (\texttt{presenter}) to \SI{93.1}{\milli\second} (\texttt{passive}), and the
-achieved bitrate rises with it from 2626 to 3304 to \SI{3400}{\kilo\bit\per\second}, lifting VMAF from
-79.5 to 85.3 to 86.1. As the intent relaxes its delay budget, the policy spends the slack on quality.
-\Cref{sec:p2eval:conditioning} shows the conditioned policy reproducing that same ordering
+is for, and the physical metrics show where that behavioral difference is legible and where it is not.
+Read from the same three-seed cells as \cref{tab:p2results}, achieved bitrate rises monotonically as the
+intent relaxes, from 2895 to 3102 to \SI{3441}{\kilo\bit\per\second}, and VMAF rises with it from 81.8
+to 83.6 to 86.2. Delivered latency does \emph{not} order monotonically --- \SI{68.8}{\milli\second}
+(\texttt{interactive}), \SI{56.9}{\milli\second} (\texttt{presenter}), \SI{88.8}{\milli\second}
+(\texttt{passive}) --- but the \texttt{interactive} figure carries a 95\% interval of
+$\pm\SI{34}{\milli\second}$ across the nine cells against $\pm\SI{1.2}{\milli\second}$ for
+\texttt{presenter}, so the apparent inversion is a statement about how variable delivered latency is
+under the tightest deadline rather than about the ordering. What the intent buys is therefore visible on
+quality and rate at this resolution and not on delivered latency, and
+\cref{sec:p2eval:conditioning} recovers the latency trend where it is measurable: over the continuous
+intent sweep, which averages eleven operating points rather than three, latency rises with the intent
+parameter in both conditioned arms. The conditioned policy reproduces the bitrate and quality ordering
 \emph{continuously}, as a function of the intent it is handed, rather than in three discrete steps.
 
-\gap{the three physical-metric triples in the paragraph above come from the earlier single-training-seed
-run (\texttt{runs/ab-prof-*}), not from the three-seed table above it, and the \texttt{interactive}
-checkpoint there had twice the training budget of the other two. The QoE numbers have been re-derived at
-three seeds; these have not. The ordering is qualitative and is independently corroborated by the
-continuous sweep of \cref{sec:p2eval:conditioning}, so the claim is safe --- but the specific values
-should be re-read from \texttt{runs/ab-prof2-ev*-tr*/ab\_summary.json}, which already records them, or
-the sentence should be rewritten to quote the sweep instead and drop the triples.}
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=\linewidth]{p2eval_qoe_bars.png}
+  \caption{\Cref{tab:p2results} as a chart: mean QoE by policy and evaluation intent on the dynamic
+  six-path scenario, over three training seeds $\times$ three evaluation seeds $\times$ five episodes.
+  Error bars are $\mathit{SD}_{\mathrm{train}}$ and are absent for the deterministic baselines, which
+  carry no learned component. Each intent is evaluated under its own reward and deadline, so bars are
+  comparable within a color and not across colors; the ordering within each color is the claim. Source:
+  \texttt{rl-mpquic/runs/ab-prof2-ev*-tr*/ab\_summary.json}, the same three-seed aggregates as
+  \cref{tab:p2results}.}
+  \label{fig:p2eval:qoebars}
+\end{figure}
 
-\begin{figure}[t]
+\begin{figure}[tbp]
   \centering
   \includegraphics[width=\linewidth]{p2eval_path_mechanism.png}
   \caption{The mechanism, within a single \SI{30}{\second} episode of the dynamic six-path scenario
@@ -622,27 +658,43 @@ the sentence should be rewritten to quote the sweep instead and drop the triples
   ${\approx}13$--\SI{15.5}{\second}, path~4 at ${\approx}7$--\SI{11}{\second} --- and in every case the
   corresponding trace in (d) falls to zero over the same window and recovers when the path does. The
   agent also shades allocation away from the \SI{40}{\milli\second} latency trap (path~2, the upper
-  curve in (b)) without abandoning it. Source:
+  curve in (b)) without abandoning it. Unlike every other measurement in this chapter, this is a
+  \emph{single} episode of one evaluation seed of one training seed, shown as an illustration of the
+  mechanism and chosen as representative rather than by a stated criterion; the quantitative form of
+  the claim, over all 81 cells, is in the text. Source:
   \texttt{rl-mpquic/runs/\allowbreak ab-prof2-\allowbreak evinteractive-trinteractive/\allowbreak interactive/seed-1000-t1}.}
   \label{fig:p2eval:mechanism}
 \end{figure}
 
-\Cref{fig:p2eval:mechanism} shows the behavior behind these numbers within a single episode. The
+\Cref{fig:p2eval:qoebars} plots the same three-seed aggregates as \cref{tab:p2results}, and
+\cref{fig:p2eval:mechanism} shows the behavior behind them within a single episode. The
 reallocation claim is visible directly: each interval in which a path's loss saturates at 1.0 --- the
 signature of churn taking it down --- is an interval in which its allocated share is zero, and the
 share returns when the path does.
 
-\gap{two qualifications on the figure above, and one figure still missing. (i) It is \emph{one}
-episode of one evaluation seed of one training seed, chosen as representative and not by any stated
-criterion --- say so in the caption, since every other number in this chapter is graded over a
-$3\times3$ grid and a reader is entitled to know this one is not. (ii) The claim the figure supports
-is qualitative co-occurrence; the quantitative version --- mean allocated share to a path in the
-windows where it is down, which should be indistinguishable from zero, against its share when live ---
-is computable from the same traces and is what would make this a measurement rather than an
-illustration. (iii) Still missing is the grouped bar or slope chart of \cref{tab:p2results}, which
-reads poorly as an eight-row table; build it from the three-seed \texttt{ab\_summary.json} aggregates
-rather than from \texttt{figure1\_qoe} of a single cell, which would understate the evidence behind
-the table it replaces.}
+\paragraph{The same claim, measured over the grid.} A figure of one episode is an illustration, so we
+recomputed it over all 81 evaluation cells, and doing so separates a statistic that cannot fail from
+two that can. The share allocated to a path while it is down is \emph{exactly} zero, over 35{,}433
+down-path frames --- but that measures the masked softmax, which excludes inactive paths by
+construction (\cref{sec:p2design:scoring}), not the policy. It confirms the liveness mask is wired
+through end to end and is worth nothing as behavioral evidence.
+
+What the architecture does \emph{not} force is whether the scheduler takes a recovered path back, and
+where it puts the freed bytes meanwhile. Measuring both against each path's own pre-outage share ---
+normalized by an even split over the live set, since with fewer paths live every share inflates
+mechanically --- gives one positive and one negative. Across 123 churn events per intent, a returning
+path is restored to 90\% of its pre-outage share within \textbf{three frames} (\SI{0.1}{\second}) in
+83--89\% of events, and ends 30 frames later slightly \emph{above} where it started
+($1.02$--$1.11\times$). Nothing forces that: a policy that quietly abandoned recovered paths would read
+zero here forever and would be wasting capacity invisibly. But the redistribution during an outage is
+\emph{not} delay-aware at the intents that price delay most. The correlation between a live path's gain
+in share and its negated smoothed RTT is $+0.075$ $[0.130]$ under \texttt{interactive} and $+0.016$
+$[0.125]$ under \texttt{presenter}, both inside their own training-seed spread; only \texttt{passive}
+clears it, at $+0.221$ $[0.047]$. The freed bytes are spread roughly in proportion to what was already
+there rather than steered toward the faster paths. That is a real limitation, and it is the same
+quantity --- delay-weighted allocation --- that \cref{sec:p2eval:ns3} finds decides whether a policy
+transfers to the packet-level backend.
+
 
 \subsection{When Does Splitting Help? The Governing Quantity}
 \label{sec:p2eval:regimes}
@@ -683,16 +735,72 @@ rejoins \cref{ch:single_path} --- the value of the control machinery is itself a
 The trend is one of the few in this chapter that reproduced without qualification when the experiment
 was rerun at three training seeds: the single-seed version of the same measurement read 39/55/81\%.
 
-\gap{turn the two paragraphs above into a measured two-dimensional map, which would be this chapter's
-counterpart to \cref{fig:p1eval:ceiling} and its strongest single figure. Rows: headroom heterogeneity,
-swept by scaling the per-path capacity spread and the dynamics hazard rates
-(\texttt{rl-mpquic/configs/dynamic.yaml}, \texttt{dynamics:} block, and the held-out
-\texttt{dynamic\_ood\_\{harsh,mild\}.yaml}). Columns: the three intents of \cref{tab:p2profiles}. Cell
-value: the app-only recovery ratio, which is the cleanest scalar summary of ``how much did the
-scheduler contribute here''. Nine reference points already exist in
-\texttt{rl-mpquic/docs/TUNING\_DYNAMICS.md} \S4 and can seed the grid; the full sweep is evaluation-only
-against checkpoints already on disk. Specified as work item W4 in
-\texttt{rl-mpquic/docs/THESIS\_BRIEF.md}.}
+\paragraph{The two axes, measured together.} The two paragraphs above vary one axis each. Varying both
+at once turns them into a map, and the map says something neither marginal does.
+\Cref{fig:p2eval:regimemap} sweeps the network's harshness against the three intents: five network
+regimes (rows) $\times$ three intents (columns), nine evaluation cells each, 135 in total, all
+evaluation-only against the specialists of \cref{tab:p2results}. The rows interpolate the six
+\texttt{dynamics:} parameters --- churn, regime-shift, burst, and correlated-failure rates and
+intensities --- between the two held-out configurations \texttt{dynamic\_ood\_\{mild,harsh\}.yaml},
+holding topology, video, and reward fixed, so the only thing that varies down a column is the dynamics
+and the nominal row reproduces \cref{tab:p2results} exactly. The row coordinate is not that parameter
+bundle but a \emph{measured} consequence of it: the mean loss fraction the \emph{even} baseline suffers
+in that cell, which is the direct observation of ``does an even split overdrive the weakest live path''.
+
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=\linewidth]{p2eval_regime_map.png}
+  \caption{The scheduler's contribution over network regime $\times$ application intent, on the dynamic
+  six-path scenario. (a) Cell value is $\mathrm{QoE}(\text{learned}) - \mathrm{QoE}(\text{app-only})$,
+  the QoE the transport agent adds over an even split, at three training $\times$ three evaluation seeds
+  per cell; \texttt{*} marks cells where the learned pair no longer ranks first in all nine.
+  (b) The same values against the measured row coordinate --- the \emph{even} baseline's loss fraction
+  --- which is where the interaction between the two axes is visible: the three intents are within
+  0.039 QoE of one another on the mild environment and span 0.566 on the harsh one. Rows r0 and r4 are
+  held-out configurations; the checkpoints are trained on the nominal row throughout. Source:
+  \texttt{rl-mpquic/runs/w4-r\{0..4\}-*/ab\_summary.json}.}
+  \label{fig:p2eval:regimemap}
+\end{figure}
+
+The planned cell value was the app-only recovery \emph{ratio} used in the two paragraphs above, and it
+does not survive the grid: it is interpretable only while both QoE means are positive, and in the harsh
+row they are not, so two negatives divide to $+26.8$ on one cell and the learned pair itself falls below
+the even-split floor. Every normalized variant fails the same way. The map therefore reports the
+absolute contribution $\mathrm{QoE}(\text{learned}) - \mathrm{QoE}(\text{app-only})$, which is defined
+everywhere and is the quantity the ratio was standing in for. That is worth stating rather than
+quietly substituting, because it bounds the ratio wherever this chapter quotes it, including the
+35/61/84\% above: a recovery ratio is a usable summary only inside the regime where the system works.
+
+\paragraph{The predicted shape holds, and the two axes are not separable.} The contribution rises
+monotonically down every column --- by $14\times$, $27\times$, and $17\times$ from the mild to the harsh
+environment --- and monotonically across every row from \texttt{passive} to \texttt{interactive} in the
+four rows where the system still works. That is the two-axis version of the mechanism this section
+argues for, and it is measured rather than inferred from two separate sweeps. What the map adds is that
+the axes \emph{interact}: the spread across the three intents grows from 0.039 QoE on the mild
+environment to 0.288 at nominal to 0.566 on the harsh one, a factor of 14.5. Intent strictness barely
+matters when the network is benign, because an even split is survivable however tight the deadline, and
+dominates when it is harsh. An additive reading of the two marginals would be wrong, and a practitioner
+who measures the intent axis on a well-behaved network will conclude the intent hardly matters.
+
+\paragraph{Where the system breaks.} The same map bounds the chapter's headline claim, and this is the
+more important half of it. Ranking stability degrades down the rows: the learned pair is first in 9 of 9
+cells at every intent on the mild and mild--nominal environments, 8/9, 9/9, and 9/9 at nominal, and then
+1/9, 5/9, and 6/9 one step below --- and on the harsh held-out environment \textbf{0 of 9, 0 of 9, and 3
+of 9}. There its mean QoE is negative at two of three intents ($-0.369$ under \texttt{interactive},
+$-0.039$ under \texttt{presenter}), while plain WebRTC-style GCC scores $+0.305$, $+0.353$, and $+0.437$
+and beats it in all three columns, as does the \emph{path-only} ablation. That the ablation which keeps
+our scheduler and drops our bitrate controller is the one that survives identifies which half breaks:
+the application agent keeps asking for a bitrate the network cannot carry. The training-seed spread
+rises with it, from 0.018--0.024 in the mild row to 0.051--0.339 in the harsh one, so the learner is not
+merely worse outside its training distribution but \emph{inconsistent} outside it.
+
+The honest form of \cref{sec:p2eval:results}'s claim is therefore bounded rather than universal: the
+learned pair beats every comparison point on the network it trained on \emph{and} on a milder one it
+never saw, and loses to a hand-written heuristic on a harsher one. This is the same wall
+\cref{sec:p2eval:ablation}'s domain-randomization arm meets from the other direction, where the harsh
+held-out environment turned both arms negative; the map adds a per-cell ranking behind that observation
+and locates where along the axis the reversal happens, which is between the nominal environment and one
+whose even-split loss fraction is 25\% higher.
 
 \subsection{Do the Intents Produce Different Policies?}
 \label{sec:p2eval:transfer}
@@ -792,25 +900,36 @@ policy graded at all three intents against the \cref{tab:p2transfer} bar.
 \paragraph{One policy does the work of three, at no measurable cost.} The global-only arm matches the
 best specialist under all three intents, with no margin distinguishable from zero and two of the three
 nominally positive. The per-path arm matches under \texttt{passive} and \texttt{presenter} and carries a
-persistent shortfall under \texttt{interactive}. This is the multipath analogue of
+persistent shortfall under \texttt{interactive} --- which has a cause, and it is not the conditioning
+scheme: \cref{tab:p2fixednorm} below closes it. This is the multipath analogue of
 \cref{sec:p1eval:intent}'s result and it is the chapter's answer to the thesis's central question --- but
 it must be stated as \emph{parity}, not superiority. A failure to detect a difference at this spread is
 not a demonstration of equivalence, and the claim the chapter makes is the weaker, defensible one:
 \emph{a single conditioned policy replaces three specialists without measurable loss}, at a third of the
 training cost and with one artifact to deploy rather than three.
 
-\gap{this paragraph does the right thing --- it states the result as parity rather than superiority ---
-and then omits the one number that makes parity a claim instead of an absence. Report the
-\textbf{minimum detectable effect}: at the pooled training-seed spreads in \cref{tab:p2intent}
-(0.028--0.059) and six seeds per arm, what size of QoE difference would this design have detected?
-It is a two-line computation from numbers already in the table, and it converts ``we found no
-difference'' into ``we would have found a difference larger than $X$, and there was none'', which is
-the only form of a null a reviewer can accept. Quote $X$ against the effects the chapter cares about:
-the specialist margins it is being compared to are 0.002--0.048, so if $X$ lands above them the honest
-reading is that this experiment could not have resolved the question either way --- which is itself
-worth stating, and is consistent with \cref{tab:p2transfer} having failed to separate the specialists
-at all. Two sentences, and they are the difference between a defensible null and a claim that reads as
-wishful.}
+\paragraph{The resolution of that null, stated.} A null is only a claim alongside the effect size it
+could have detected, so we compute it. Treating the training seed as the unit of replication --- which
+is what $\mathit{SD}_{\mathrm{train}}$ is for --- with six seeds per arm, the pooled spreads of
+\cref{tab:p2intent}, $\alpha = 0.05$ and 80\% power, the minimum detectable effect is
+\SIrange{0.063}{0.087}{} QoE across the three intents.
+
+\emph{Every effect this chapter is asking about is smaller than that.} The specialist margins in
+\cref{tab:p2transfer} span 0.002--0.048, and the largest conditioned-versus-bar margin in
+\cref{tab:p2intent} is 0.048. The honest reading is therefore not ``the conditioned policy matches the
+specialists'' but \emph{this experiment could not have resolved the question either way at the
+resolution it achieves}, and the parity statement should be read as bounding the difference to under
+about 0.07 QoE rather than as evidence of equivalence. That also explains \cref{tab:p2transfer} in the
+same breath: the specialists failed to separate from one another for the same reason, so the bar was
+noise-limited before the conditioned arms ever met it.
+
+Two things follow that are worth more than the null itself. First, the fix is not more seeds but a
+\emph{paired} design: the effect that \cref{tab:p2fixednorm} detects, $+0.036$, is well below this
+minimum detectable effect and was resolved anyway, because there the two arms are compared cell by cell
+on matched environment draws rather than as two independently trained populations. Pairing bought
+roughly a factor of two in resolution at no extra compute, and it is the cheaper lesson. Second, it
+sets a floor on what any future comparison of conditioning schemes on this scenario needs to be
+designed for.
 
 Two caveats belong with it rather than after it. First, the bar itself is noise-limited: the specialists
 were not measurably specialized (\cref{tab:p2transfer}), so ``matches the specialists'' is a weaker
@@ -837,75 +956,193 @@ shift-invariance stops constraining it at all. The proposition is not wrong --- 
 function class it names --- but the function class is narrow enough that a deep encoder escapes it
 without being designed to.
 
-The practical consequence is that per-path conditioning is \emph{not} empirically justified in this
-system. It costs 30 additional input dimensions, scored no better on divergence, scored worse on QoE at
-two of three intents, and, as the next paragraph shows, interpolates less smoothly.
+Read on those numbers alone, per-path conditioning is \emph{not} empirically justified in this system:
+it costs 30 additional input dimensions, scores no better on divergence, and scores worse on QoE at two
+of three intents. But the chapter's own theory names a suspect for that shortfall, and testing it
+changes the verdict.
 
-\gap{the chapter reports per-path conditioning losing on every axis it measures and never says
-\emph{why}, which leaves its own recommended design mechanism unexplained at the moment it is
-abandoned. There is a specific and testable suspect already documented: breaker~3 of
-\cref{sec:p2design:cancel}, the observation normalizer that carries the intent into the per-path rows
-(\cref{app:p2hyper}, ``Variant~A''). Under per-path conditioning the intent reaches each path row
-\emph{twice} --- once as a broadcast feature and once as a $4\times$ rescaling of that row's sRTT
-column --- and the network must learn to reconcile two correlated channels rather than one, which is
-the mechanism one would expect to cost exactly what is observed: no gain in divergence, a loss in QoE,
-and a non-monotone latency curve. \texttt{intent.obs\_norm: fixed} closes that channel exactly (row
-span 0.000, last row of \cref{tab:p2cancel}), is implemented and test-guarded, and has never been
-trained --- it is listed as unmeasured in \texttt{rl-mpquic/docs/RESULTS.md} \S10.5. Three seeds is
-${\approx}4.5$\,h and settles it either way: if the shortfall closes, the chapter gains a mechanism
-for its own negative result and the design principle is vindicated rather than merely defended on
-guarantees; if it does not, the chapter can say the leak is \emph{not} the explanation and attribute
-the cost to the 30 extra input dimensions, which is a cleaner statement than the current silence. Run
-it, and note it must not run concurrently with an NS-3 job (shared-memory segment collision, see the
-gap at \cref{sec:p2eval:ns3}).} What survives is an
-argument about guarantees rather than performance: per-path injection is the only routing that is
-guaranteed to work, and global routing happened to work here through a mechanism nobody specified and
-nobody can rely on. That is a design principle with an honest boundary on it, which is worth more than
-the unqualified version the chapter set out to prove.
+\paragraph{The shortfall is the normalizer leak, not the conditioning scheme.} Breaker~3 of
+\cref{sec:p2design:cancel} is a mechanism specific to the per-path arm. Under per-path conditioning the
+intent reaches each path row \emph{twice} --- once as the broadcast feature the design intends, and once
+as a $4\times$ rescaling of that row's sRTT column by a latency normalizer that is itself part of the
+intent --- so the network must reconcile two correlated channels where the design specifies one. Setting
+\texttt{intent.obs\_norm: fixed}, which pins the observation scales to the G.114 and Y.1541 constants and
+closes that channel exactly (row span 0.000, last row of \cref{tab:p2cancel}), isolates it. We train a
+third arm that way, three seeds at the matched budget, and grade it against the per-path arm on the same
+cells; each side is evaluated under the normalizer it trained with, so the delta is paired per training
+seed $\times$ evaluation seed. \Cref{tab:p2fixednorm} reports it.
+
+\begin{table}[t]
+  \centering
+  \caption{Closing the observation-normalizer channel under per-path conditioning. \emph{Bar} is the
+  best specialist per intent (column maxima of \cref{tab:p2transfer}); \texttt{profile} is the deployed
+  Variant~A normalizer, which carries the intent into each path's sRTT column; \texttt{fixed} pins the
+  normalizers across intents and closes that channel exactly. Both arms are three training seeds
+  $\times$ three evaluation seeds, so the \texttt{profile} column is the three-seed grading of the arm
+  \cref{tab:p2intent} grades at six and the two differ accordingly; the last two columns are paired per
+  cell, which is what the matched seed counts buy. $\mathit{SD}_{\mathrm{train}}$ in brackets. Source:
+  \texttt{rl-mpquic/runs/ab-intentfx-*/ab\_summary.json}.}
+  \label{tab:p2fixednorm}
+  \small
+  \begin{tabular}{lccccc}
+    \toprule
+    Evaluated under & Bar & \texttt{profile} & \texttt{fixed} & \texttt{fixed} $-$ \texttt{profile} & Cells won \\
+    \midrule
+    \texttt{interactive} & 0.635 [0.019] & 0.594 [0.041] & \textbf{0.630} [0.024] & $+0.036 \pm 0.016$ & 9/9 \\
+    \texttt{presenter}   & 0.735 [0.021] & 0.687 [0.020] & \textbf{0.719} [0.020] & $+0.033 \pm 0.012$ & 8/9 \\
+    \texttt{passive}     & 0.818 [0.017] & 0.810 [0.054] & \textbf{0.821} [0.010] & $+0.011 \pm 0.030$ & 5/9 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Closing the leak recovers $+0.036 \pm 0.016$ under \texttt{interactive} and $+0.033 \pm 0.012$ under
+\texttt{presenter} --- the two intents that carried a deficit, positive in 9 of 9 and 8 of 9 paired cells
+--- and nothing measurable under \texttt{passive} ($+0.011$, 5 of 9), which never had one. An effect that
+appears exactly where the deficit was and only there is what a mechanism looks like; a difference in
+training luck would not respect that pattern. The residual shortfalls, $-0.006$ and $-0.015$, are inside
+the pooled training-seed spread and are no longer detectable. Two secondary signs point the same way.
+The training-seed spread \emph{tightens}, from 0.041 to 0.024 under \texttt{interactive} and from 0.054
+to 0.010 under \texttt{passive} --- the only intervention in this chapter that reduced it, against the
+seed count doubling, which did not. And the per-cell ranking improves: under \texttt{interactive} the
+learned pair goes from first in 6 of 9 cells to first in 8 of 9.
+
+A direct probe confirms the channel rather than only its consequence. Sweeping the intent with the
+decision context frozen admits breakers 1 and 2 alone; rebuilding the whole observation per intent
+additionally admits breaker~3. Under \texttt{profile} the two probes differ by $-0.024$ in divergence.
+Under \texttt{fixed} they agree \emph{to every printed digit on every training seed}, which is
+\cref{tab:p2cancel}'s row-span-0.000 result confirmed end to end on trained policies rather than on a
+freshly initialized network. The sign under \texttt{profile} is itself informative: rebuilding the
+observation \emph{reduces} measured divergence, so the normalizer channel and the intended per-path
+channel partly cancel each other. The per-path arm was not merely carrying a redundant input; it was
+spending capacity reconciling two inputs that partly undo one another.
+
+The consequence for the design is that the two conditioning schemes are at \emph{parity} on QoE once the
+leak is closed --- \texttt{fixed} scores $0.630 / 0.719 / 0.821$ against the global-only arm's
+$0.639 / 0.693 / 0.823$, differences of $-0.010$, $+0.027$, and $-0.002$, all inside the training-seed
+spread and mixed in sign. Per-path conditioning is therefore not the empirically inferior option this
+section was about to call it; it is the equally good option that carries a guarantee the cheaper one
+does not, and the cost measured earlier was an implementation choice rather than a property of the
+scheme. That choice was made deliberately and for a good reason --- disclosing the normalizer as an
+input is what keeps the per-intent specialists of \cref{tab:p2transfer} a valid baseline
+(\cref{app:p2hyper}) --- but any new conditioned arm should fix the normalizers. What survives is an
+argument about guarantees that no longer has to be made \emph{against} performance: per-path injection
+is the only routing that is guaranteed to work, it costs nothing measurable once its own leak is
+closed, and global routing happened to work here through a mechanism nobody specified and nobody can
+rely on.
+
+Two limits bound this. It is three training seeds against the six-seed arms of \cref{tab:p2intent}, so
+only the \texttt{fixed}-versus-\texttt{profile} delta is properly paired; and the \texttt{interactive}
+block remains rank-unstable in both arms, so it is the intent at which this scenario discriminates least
+reliably --- which the intervention did not change.
 
 \paragraph{The conditioned policy interpolates across a continuum of intents.} Sweeping the intent
-linearly from \texttt{interactive} to \texttt{passive} in eleven steps, both arms trade delay for
-quality monotonically and smoothly: achieved bitrate rises from ${\approx}2500$ to
-\SI{3440}{\kilo\bit\per\second} (per-path) and ${\approx}2890$ to \SI{3830}{\kilo\bit\per\second}
-(global-only), with no single step of the sweep carrying the trend. Because the intent bundle contains
-the deadline, the raw metrics move even for a policy that ignores the intent entirely, so the
-de-confounded statistic is the ratio of the learned policy's span to a non-learning control's span over
-the same rollouts: the conditioned policies adapt by 17--24$\times$ the control on bitrate and VMAF.
-Spearman $\rho$ against $\lambda$ is $0.80$ and $0.71$ for the global-only arm on bitrate and VMAF, and
-$0.96$ on latency against the per-path arm's $0.41$ --- the per-path arm's latency curve is non-monotone,
-climbing then falling back, while the global-only arm's rises cleanly. Per-path conditioning has now
-scored equal-or-worse on all three axes measured.
+linearly from \texttt{interactive} ($\lambda = 0$) to \texttt{passive} ($\lambda = 1$) in eleven steps,
+over all six training seeds of each arm, both arms trade delay for quality smoothly and monotonically
+(\cref{fig:p2eval:intentsweep}). Achieved bitrate rises from 2379 to \SI{3505}{\kilo\bit\per\second}
+(per-path) and 3003 to \SI{3679}{\kilo\bit\per\second} (global-only), with no single step of the sweep
+carrying more than a quarter of the trend. Because the intent bundle contains the deadline, the raw
+metrics move even for a policy that ignores the intent entirely, so the de-confounded statistic is the
+ratio of the learned policy's span to a non-learning control's span over the same rollouts: the
+conditioned policies adapt by 11--24$\times$ the control on bitrate and VMAF. What is licensed by this
+is that the policy generalizes across a \emph{continuum} of intents rather than memorizing three
+operating points --- the counterpart of \cref{sec:p1eval:zeroshot}'s claim, but not the same claim.
+Training sampled the intent space continuously, so the interior $\lambda$ are in-distribution; only
+$\lambda = -0.2$ and $\lambda = 1.2$ are genuinely unseen, and they fail asymmetrically. At
+$\lambda = 1.2$ (deadline \SI{924}{\milli\second}) both arms hold QoE at 0.83 while latency rises to
+\SIrange{134}{144}{\milli\second}; at $\lambda = -0.2$ (deadline \SI{56}{\milli\second}) both collapse,
+to 0.19 and 0.25, with bitrate falling to ${\approx}\SI{1590}{\kilo\bit\per\second}$. The policies
+extrapolate toward looser intents and not toward stricter ones, which is the expected direction, since
+$\lambda < 0$ asks for a deadline below anything the network can deliver rather than merely an
+unfamiliar one.
 
-\gap{state the scope of the interpolation claim explicitly in the text above rather than only here, and
-choose deliberately, because the natural phrasing overclaims. Training sampled the intent space
-\emph{continuously} (\texttt{configs/dynamic\_intent.yaml}, \texttt{continuous: true,
-anchor\_frac: 0.5}), so interior $\lambda$ are in-distribution. What is licensed is \emph{``the policy
-generalizes across a continuum of intents rather than memorizing three operating points''} --- a real
-claim, and the counterpart of \cref{sec:p1eval:zeroshot}'s. What is \emph{not} licensed is a zero-shot
-claim about the interior, which is what \cref{ch:single_path} demonstrates and what a reader will assume
-is meant here unless told otherwise. Only $\lambda = -0.2$ and $\lambda = 1.2$ are genuinely unseen, and
-they fail asymmetrically: at $\lambda = 1.2$ (deadline \SI{924}{\milli\second}) both arms hold QoE at
-0.82, while at $\lambda = -0.2$ (deadline \SI{56}{\milli\second}) both collapse to ${\approx}0.16$. That
-asymmetry is worth reporting --- the policies extrapolate toward looser intents and not toward stricter
-ones, which is the expected direction, since $\lambda < 0$ asks for a deadline below anything the
-network can deliver rather than merely an unseen one. Training a third arm at
-\texttt{anchor\_frac: 1.0} (anchors only, no interior sampling) is what would license the strong
-zero-shot claim, and it is one training run.}
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=0.82\linewidth]{p2eval_intent_sweep.png}
+  \caption{Intent interpolation for both conditioned arms: achieved bitrate, VMAF, and delivered latency
+  against the intent parameter $\lambda$, which linearly interpolates the whole intent bundle from
+  \texttt{interactive} to \texttt{passive}. Six training seeds per arm, bands are
+  $\mathit{SD}_{\mathrm{train}}$, dotted lines mark the two trained anchors, and the shaded flanks are
+  the two genuinely unseen extrapolation points. The dashed control is the intent-blind WebRTC policy
+  over the same rollouts, which is what de-confounds the sweep: because the intent carries the frame
+  deadline, the raw metrics move for a policy that ignores it. Source:
+  \texttt{rl-mpquic/runs/sweep6-intent-\{pp,gl\}/intent\_sweep.json}.}
+  \label{fig:p2eval:intentsweep}
+\end{figure}
 
-\gap{the operational argument for a conditioned policy is one this chapter never makes and could make
-cheaply: \emph{changing intent mid-call}. Everything measured here holds the intent fixed for an
-entire episode, which is precisely the regime in which three specialists and one conditioned policy
-are interchangeable --- a deployment can load the right specialist at call setup and pay nothing. The
-conditioned policy's real advantage appears only when the intent moves while the connection is up: a
-call that starts as screen-share and becomes conversational, or an application that tightens its
-deadline under user interaction. Swapping model weights mid-call is a bad answer; taking the intent as
-an input is the good one, and no experiment in this thesis exercises it. One evaluation run does:
-step or ramp $\lambda$ at mid-episode and show the split, target bitrate, and delivered latency
-tracking the change within some settling time, against a specialist that cannot follow it at all. It
-needs no training --- the six \texttt{ab-intent6-*} checkpoints already exist and
-\texttt{evaluate.py} already accepts an intent override --- and it produces both the chapter's most
-persuasive figure and the answer to ``why not just train three models''. It is named as the wanted
-bonus in \texttt{rl-mpquic/docs/THESIS\_BRIEF.md} \S3.7.}
+\paragraph{The tie-breaker between the two arms does not survive six seeds.} At three training seeds
+this sweep read as a third axis on which global-only conditioning was the better arm: Spearman $\rho$
+against $\lambda$ was $0.96$ on latency for the global arm against the per-path arm's $0.41$, whose
+latency curve climbs and then falls back. At six seeds latency still favors the global arm (0.973
+against 0.445), but bitrate and VMAF \emph{reverse} to favor per-path (1.000 and 0.991 against 0.800 and
+0.755), where the three-seed reading had them the other way. Decomposing the pooled statistic per
+training seed shows why, and it is a failure mode distinct from the ones this chapter has reported so
+far: the per-path arm's bitrate trend is positive in all six seeds, while the global arm's is positive
+in four and \emph{strongly negative} in two ($\rho = -0.536$ and $-0.982$, training-seed spread 0.789
+against the per-path arm's 0.243). Two of six global-only policies raise their bitrate as the intent
+gets stricter --- the wrong direction --- and the pooled $\rho$ of 0.800 conceals it completely. Nothing
+was under-sampled here; the summary statistic was simply computed over the wrong axis first
+(\cref{sec:p2eval:seeds}). The honest statement is that the two conditioning schemes are not separable
+on interpolation quality either, which leaves the 30 saved input dimensions as the only surviving reason
+to prefer global-only --- an efficiency argument rather than a behavioral one.
+
+\gap{one training run would upgrade the interpolation claim from continuum generalization to genuine
+zero-shot: a third arm at \texttt{anchor\_frac: 1.0} (anchors only, no interior sampling), which is
+what would make the interior $\lambda$ unseen rather than in-distribution and put this result on the
+same footing as \cref{sec:p1eval:zeroshot}'s.}
+
+\paragraph{The intent moves while the call is up.} Every result above holds the intent fixed for a whole
+episode, and that is precisely the regime in which three specialists and one conditioned policy are
+interchangeable: a deployment without conditioning simply loads the right specialist at call setup and
+pays nothing. The conditioned policy's operational advantage exists only when the intent moves
+\emph{mid-connection} --- a call that starts as screen-share and becomes conversational, or an
+application that tightens its deadline when the user starts interacting. Swapping model weights mid-call
+is a poor answer; taking the intent as an input is the good one. \Cref{fig:p2eval:intentswitch} is the
+experiment, and it is the case the fixed-intent measurements structurally cannot make.
+
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=\linewidth]{p2eval_intent_switch.png}
+  \caption{Changing the application's intent \SI{15}{\second} into a \SI{30}{\second} call. The reward,
+  the frame deadline, and the observation normalizers all change at the switch for \emph{every} arm ---
+  the world changes for all three --- but only the conditioned policy can observe it, because only its
+  observation carries the intent. Three conditioned checkpoints or three specialists $\times$ three
+  evaluation seeds; curves are means over the nine cells. Post-switch QoE, scored under the post-switch
+  reward: (a) $0.823$ $[\mathit{SD}_{\mathrm{train}}\,0.042]$ conditioned, $0.803$ $[0.008]$ pre-switch
+  specialist, $0.797$ $[0.017]$ post-switch specialist; (b) $0.583$ $[0.035]$, $0.262$ $[0.311]$,
+  $0.416$ $[0.293]$. Source: \texttt{rl-mpquic/runs/intent-switch-\{i2p,p2i\}.json}.}
+  \label{fig:p2eval:intentswitch}
+\end{figure}
+
+The two directions are not symmetric, and only one of them is an argument. \textbf{Relaxing} the
+deadline costs a policy that cannot see the change essentially nothing: $+0.020$ QoE for the conditioned
+arm, inside its own training-seed spread of $0.042$. That is the expected direction --- a controller
+tuned for a strict budget is merely conservative under a loose one, and \cref{fig:p2eval:intentswitch}(a)
+shows all three arms tracking each other. \textbf{Tightening} is where conditioning earns its keep. When
+the deadline drops from \SI{800}{\milli\second} to \SI{180}{\milli\second}, the specialist still running
+the pre-switch policy sees delivered latency spike to ${\approx}\SI{1100}{\milli\second}$ --- six times
+the new budget --- and take some ten seconds to drain, while the conditioned policy's stays flat at
+${\approx}\SI{50}{\milli\second}$ and never crosses the new deadline at all.
+
+The margin must be read carefully. $+0.321$ QoE over the pre-switch specialist is about $1\sigma$ against
+that specialist's own training-seed spread of $0.311$, so it does \emph{not} clear this chapter's
+decision rule on the mean. What does clear it is the consistency: the conditioned arm's spread is
+$0.035$ against $0.311$ and $0.293$, an order of magnitude tighter, and its \emph{worst} training seed
+($+0.556$) beats the pre-switch specialist's mean ($+0.262$) and the post-switch specialist's ($+0.416$).
+The defensible claim is about reliability under a mid-call intent change rather than about the average.
+
+The mechanism is visible in the figure and it is the one this chapter has been arguing for. After the
+switch the conditioned policy runs a \emph{higher} target bitrate than the pre-switch specialist
+(${\approx}2800$ against ${\approx}\SI{2350}{\kilo\bit\per\second}$) while delivering roughly twenty
+times lower latency. A higher offered load with lower delivered delay cannot come from rate control; it
+has to come from where the bytes are placed. This is the most direct behavioral evidence in the chapter
+that the intent reaches the allocation decision and not merely the encoder.
+
+Three limits. This is the mock backend only, because retargeting the intent mid-episode is mock-only by
+construction --- the packet-level body takes its deadline as a process-start argument. The switch is a
+step rather than a ramp. And the post-switch specialist is a \emph{lower} bound on what instantaneous
+weight-swapping would achieve, not an upper one: it lived through the pre-switch half too and carries
+the same queue state, which is why it also spikes, to ${\approx}\SI{530}{\milli\second}$, where a call
+that had started under the tight deadline would not.
 
 \subsection{Does It Survive a Packet-Level Transport Stack?}
 \label{sec:p2eval:ns3}
@@ -1034,21 +1271,29 @@ behavioral correlation across six policies, not an intervention, so it does not 
 lower delay-weighted allocation would make a non-transferring seed transfer. The intervention that would
 --- retrain with a delay-aware split prior, or raise $b$ and re-run --- is not done.}
 
-\gap{whether the system \emph{learns} on the packet-level body, as opposed to transferring to it, is
-still open and is now the chapter's most valuable remaining experiment, because \cref{tab:p2seeds} makes
-the mock's status as a training surrogate the live question rather than a footnote. NS-3-native training
-correct the cost figure before quoting it: the ${\approx}$\,4\,h per 100-episode seed recorded in
-\texttt{rl-mpquic/docs/RESULTS.md} \S9 is extrapolated from a 5-episode probe (441\,s against the
-mock's 436\,s) and does not survive contact with a full run, because per-episode cost grows with
-replay-buffer occupancy. Measured on the two seeds actually executed, an NS-3-native seed takes
-\textbf{${\approx}$\,25\,h}: seed~2 logged 86~episodes in 21.1\,h, or \SI{14.7}{\minute} per episode.
-Runs are also strictly sequential, because both \texttt{ns3ai\_utils.Experiment} and
-\texttt{ns3-ai-msg-interface.h} default the shared-memory segment name to \texttt{"My Seg"} and nothing
-overrides it, so two concurrent runs deadlock. A 3-seed NS-3 arm is therefore ${\approx}$\,75\,h
-wall-clock rather than the 12\,h previously stated, against ${\approx}$\,4.5\,h for the mock arm run
-three-up --- a factor of roughly 17. That ratio, not a fidelity judgment, is the honest reason every
-policy in this chapter is mock-trained, and it belongs in \cref{sec:p2impl:gaps} as such. This is D5 in
-\texttt{rl-mpquic/docs/RESULTS.md} \S9 and was executing at the time of writing.}
+\paragraph{Training on the packet-level body: partial, and not yet reportable.} Whether the system
+\emph{learns} on the realistic body, as opposed to transferring to it, is a different question from the
+one above, and \cref{tab:p2seeds} makes it the live one rather than a footnote. Two NS-3-native training
+seeds have since been run to completion, and both learn: episode-0 to episode-99 QoE moves from $-0.088$
+to $+0.340$ on the first and from $-0.002$ to $+0.456$ on the second. A third was interrupted at episode
+14, having reached $+0.350$ by episode 13. Two seeds is below the three-seed floor this chapter applies
+to everything else, and no A/B grading has been run against it, so the qualitative answer looks positive
+and the quantitative one is not yet claimed here.
+
+What the exercise did settle is the cost, and the previously quoted figure was wrong by a factor of six.
+The ${\approx}$\,4\,h per 100-episode seed extrapolated from a 5-episode probe (441\,s against the mock's
+436\,s) does not survive contact with a full run, because per-episode cost grows with replay-buffer
+occupancy. Measured on the two completed seeds, an NS-3-native seed takes \textbf{${\approx}$\,25\,h},
+about \SI{15}{\minute} per episode. Runs are also strictly sequential, because both
+\texttt{ns3ai\_utils.Experiment} and \texttt{ns3-ai-msg-interface.h} default the shared-memory segment
+name to \texttt{"My Seg"} and nothing overrides it, so two concurrent runs deadlock. A three-seed NS-3
+arm is therefore ${\approx}$\,75\,h wall-clock against ${\approx}$\,4.5\,h for the mock arm run three-up,
+a factor of roughly 17. That ratio, not a fidelity judgment, is the honest reason every policy reported
+in this chapter is mock-trained.
+
+\gap{finish the third NS-3-native seed (${\approx}$\,25\,h, strictly sequential) and grade the arm with
+\texttt{ab\_eval.py}, which turns the paragraph above from a status note into the chapter's answer to
+its own most valuable open question. This is D5 in \texttt{rl-mpquic/docs/RESULTS.md} \S9.}
 
 \subsection{Ablations}
 \label{sec:p2eval:ablation}
@@ -1057,8 +1302,9 @@ policy in this chapter is mock-trained, and it belongs in \cref{sec:p2impl:gaps}
 transport agent of \cref{sec:p2design:scoring} with the legacy flat MLP over a fixed-length
 concatenation --- the two configurations are field-identical apart from that one architectural key ---
 costs $0.231 \pm 0.029$ QoE, positive in all nine evaluation cells, against training-seed spreads of
-0.013 and 0.037. This is the largest effect measured anywhere in this chapter, an order of magnitude
-above the noise floor, and its importance is not the size of the gap but where the gap lands: at 0.386
+0.013 and 0.037. This is the largest effect measured anywhere in this chapter --- six to eighteen times
+the two spreads it is measured against --- and its importance is not the size of the gap but where the
+gap lands: at 0.386
 the flat agent is beaten by WebRTC and by the single-path baseline in \emph{every one} of the nine
 cells, so \textbf{with the flat head, the headline claim of this chapter is false} --- the learned pair
 ranks first in $0/9$ cells rather than $9/9$. The dynamic-input architecture is therefore not a
@@ -1073,17 +1319,19 @@ the static scenarios. And the flat arm's own training-seed spread is roughly thr
 arm's, so part of the gap is that the flat learner is less consistent rather than only worse on average;
 at three seeds those are not separable.
 
-The gap is also not bought with parameters, which is the same inversion \cref{sec:p1eval:ablation}
-reports for the discrete selector: there the fixed-action head carries 85.3\,k parameters against the
-scoring agents' 36.2--37.5\,k, less than half the size for more than double the goodput. A shared
-per-path encoder is evaluated once per candidate and reused across all of them, where a fixed head
-must spend output capacity on every slot it might ever need. In both settings the dynamic-input
-design is cheaper to store as well as better to run, and its cost is paid instead in inference time,
-which grows linearly in the path count and which \cref{fig:p2eval:decision} shows to be far inside
-the frame budget. \gap{confirm the multipath parameter counts directly and quote them here rather
-than borrowing \cref{ch:single_path}'s, which are for a different network in a different framework.
-The two configurations are field-identical apart from the architectural key, so the comparison is
-clean; a single load of each checkpoint reports it.}
+The gap is also not bought with parameters. Loading the two checkpoints directly, the scoring policy
+carries 69.1\,k parameters against the flat policy's 77.8\,k at the nominal six paths, and its critic
+140.3\,k against 155.1\,k --- 11\% fewer in both cases. The margin is smaller than the same inversion in
+\cref{sec:p1eval:ablation}, where the fixed-action head carries 85.3\,k against the scoring agents'
+36.2--37.5\,k, and the multipath comparison should be quoted on its own numbers rather than that one.
+The structural difference is the one that matters and it is not visible at $N = 6$: the flat policy's
+first layer is $256 \times (4 + 5N)$ and its two output heads are $N \times 256$ each, so it grows by
+about 1.8\,k parameters per additional path, while the scoring policy is 69,122 parameters at every path
+count from 2 to 96 (\cref{sec:p2eval:pathcount}). A shared per-path encoder is evaluated once per
+candidate and reused across all of them, where a fixed head must spend output capacity on every slot it
+might ever need. The dynamic-input design is therefore cheaper to store as well as better to run, and
+its cost is paid instead in inference time, which grows linearly in the path count and which
+\cref{fig:p2eval:decision} shows to be far inside the frame budget.
 
 \paragraph{Which half of the hierarchy carries the result?} Both, and in a way that depends on the
 intent --- on the mock. Removing the transport agent (app-only) costs 65\% of the QoE under
@@ -1122,49 +1370,47 @@ outright. The mean pool remains the default. The reason to report this rather th
 evaluated on its healthy seed alone the attention pool looked like a small win --- a concrete instance
 of the methodological point of \cref{sec:p2eval:setup}, caught in our own data.
 
-\gap{two pieces of architectural evidence that \cref{ch:single_path} carries and this chapter still does
-not, both cheap now that the flat-versus-scoring arm above exists. First, permutation invariance of the
-split under reordering of the path set --- asserted in \cref{sec:p2design:scoring} as a property of the
-architecture and verified in \texttt{rl-mpquic/tests/test\_scoring\_agent.py}, but never reported as a
-measurement, where \cref{ch:single_path} reports a 32256-trial invariance test. Second, QoE against live
-path count, the continuous counterpart of \cref{fig:p1eval:pathcount}, which is what would show the
-architecture's independence of path count empirically rather than by construction. Both are
-evaluation-only against checkpoints already on disk.}
+\paragraph{Permutation equivariance holds to float32 precision on trained policies.} The scoring head
+is permutation-equivariant by construction, and \cref{ch:single_path} backs its discrete counterpart
+with a 32256-trial invariance test rather than an assertion. The same measurement here: three trained
+checkpoints $\times$ 200 on-distribution decision contexts $\times$ 60 random permutations, for
+\textbf{36{,}000 trials}. Permutations are drawn over the whole path set, so the liveness mask is
+carried along with the rows --- the case that matters under churn, and the one a fixed-slot
+architecture cannot satisfy. Relabelling the paths permutes the split and changes nothing else: the
+largest deviation in any component of any split is $4.9\times10^{-7}$. The Deep Sets critic is
+correspondingly invariant, its largest deviation $1.5\times10^{-5}$ on values of $|Q| \approx 74$, which
+is $10^{-5}$ of the spread of $Q$ across contexts. Both are float32 round-off, which is the expected
+answer; the point of measuring is that it is now an answer rather than a claim.
 
 \paragraph{The per-frame inference cost fits the frame budget with three orders of magnitude to
 spare.} The transport agent is the design's one hard real-time component: it runs once per frame, so
 its inference must complete well inside \SI{33}{\milli\second} at 30\,fps.
-\Cref{fig:p2eval:decision} measures it. The learned split decision costs \SI{0.507}{\milli\second} on
-average on a 16-core CPU host with no GPU, tightly distributed across frames --- about 1.5\% of the
-frame budget, and roughly $23\times$ the cost of the cheapest fixed rule (even split, at
-\SI{0.0123}{\milli\second}) which is nonetheless an irrelevant difference at this scale. The
-application agent's bitrate decision is cheaper still and runs 30 times less often. Because the
-shared per-path encoder is evaluated once per candidate, the cost grows linearly in the path count,
-so the margin here corresponds to roughly 200 paths before the frame budget binds.
+\Cref{fig:p2eval:decision} measures it across methods. The learned split decision costs
+\SI{0.507}{\milli\second} on average on a 16-core CPU host with no GPU, tightly distributed across
+frames --- about 1.5\% of the frame budget, and roughly $23\times$ the cost of the cheapest fixed rule
+(even split, at \SI{0.0123}{\milli\second}), which is nonetheless an irrelevant difference at this
+scale. The application agent's bitrate decision is cheaper still and runs 30 times less often. Pooled
+over the 40{,}500 calls of a full nine-cell grading at six paths, the 99th percentile is
+\SI{0.713}{\milli\second} and the 99.9th under \SI{3.6}{\milli\second}, so the tail that a real-time
+claim actually rests on stays 10--45$\times$ inside the budget. \Cref{sec:p2eval:pathcount} measures how
+that cost scales with the path count, and reports the one part of the distribution that does not fit
+comfortably.
 
-\begin{figure}[t]
+\begin{figure}[tbp]
   \centering
   \includegraphics[width=\linewidth]{p2eval_decision_time.png}
-  \caption{Inference cost per decision, by method, on a 16-core CPU host with no GPU and with warm-up
-  calls discarded. (a) Mean cost of the bitrate decision and of the split decision, on a log scale.
-  (b) Distribution of the per-frame split decision, the design's binding real-time constraint. The
-  learned split costs \SI{0.507}{\milli\second} against a \SI{33}{\milli\second} frame budget at
-  30\,fps. Source:
+  \caption{Inference cost per decision, by method, with warm-up calls discarded. The host is an AMD
+  EPYC 7702P with 16 cores allocated, \SI{32}{\gibi\byte} of RAM, and no GPU, running PyTorch on the
+  CPU. (a) Mean cost of the bitrate decision and
+  of the split decision, on a log scale. (b) Distribution of the per-frame split decision, the design's
+  binding real-time constraint. The learned split costs \SI{0.507}{\milli\second} on average against a
+  \SI{33}{\milli\second} frame budget at 30\,fps. Decision time is a property of the host rather than of
+  the training seed --- the three checkpoints agree to within \SI{0.05}{\milli\second} at every path
+  count --- so this single evaluation cell is representative; \cref{fig:p2eval:pathcount}(b) gives the
+  same statistic pooled over all nine cells and as a function of the path count. Source:
   \texttt{rl-mpquic/runs/\allowbreak ab-prof2-\allowbreak evinteractive-trinteractive/\allowbreak interactive/seed-1000-t1}.}
   \label{fig:p2eval:decision}
 \end{figure}
-
-\gap{three fixes on the figure and the paragraph above. (i) The rendered panel~(b) y-axis label
-collides with panel~(a)'s tick labels --- regenerate with a wider figure or a shorter label before
-submission. (ii) The measurement is from one evaluation cell; decision time is a property of the
-machine rather than of the training seed, so this is defensible, but state the host specification in
-the caption as \cref{sec:analysis:overhead} does for the single-path selector, and give the 99th
-percentile alongside the mean, since a real-time claim is about the tail and the box plot already
-carries it. (iii) The linear-scaling extrapolation to ${\approx}200$ paths above is arithmetic, not a
-measurement --- either measure the cost at a few path counts, which is cheap and would also supply the
-missing counterpart to \cref{fig:p1eval:pathcount}, or soften the sentence to a scaling statement
-without a number. Finally, propagate the headline figure into \cref{sec:analysis:overhead}, which
-still carries an open gap asking for exactly this number.}
 
 \paragraph{DroQ and prioritized replay buy nothing at convergence, and little before it.} The critic
 LayerNorm with a raised update-to-data ratio, and prioritized experience replay, are enabled in every
@@ -1178,11 +1424,151 @@ head start, not a sample-efficiency win --- and a weak version of the claim at t
 update-to-data ratio is 2 rather than the 10--20 the DroQ recipe is about, so what is refuted is DroQ
 as configured here and not DroQ as published.
 
+\subsection{Does One Policy Really Serve Any Path Count?}
+\label{sec:p2eval:pathcount}
+
+The permutation-equivariant head exists so that one policy serves any number of paths, with a parameter
+count independent of $N$ and inference linear in $N$. \Cref{sec:p2design:scoring} asserts that by
+construction, and the assertion is cheap to make and easy to get wrong. This subsection measures it, as
+the continuous counterpart of \cref{fig:p1eval:pathcount}. Nothing here is retrained: every number comes
+from the same six-path checkpoints used throughout the chapter, loaded unmodified into environments with
+between two and twelve live paths.
+
+\paragraph{Holding capacity fixed, because otherwise the sweep measures bandwidth.} Truncating or
+extending the six-path topology of \cref{tab:app:p2topo} would confound path count with aggregate
+capacity: QoE would rise with $N$ because there is more bandwidth to go around, and the curve would say
+nothing about the architecture. The primary sweep therefore holds the aggregate at the nominal
+\SI{15.5}{\mega\bit\per\second} at every $N$, so that $N$ varies the \emph{granularity} of the
+allocation decision and not the \emph{amount} of resource. Each configuration reuses the six role
+templates of \cref{tab:app:p2topo} verbatim --- clean low-RTT, clean, latency trap, congested, and the
+shared-bottleneck pair --- in that order of importance for $N < 6$, cycling with scaled delays for
+$N > 6$, so the cross-traffic fractions stay in their nominal 0.30--0.55 range throughout. The minimum
+live-path count scales as $\lceil N/2 \rceil$ to preserve the nominal half-of-six fraction, and a
+shared-bottleneck group exists once per completed cycle of six, so $N = 2, 3, 4$ carry none. The $N = 6$
+configuration is byte-identical to \cref{tab:app:p2topo}'s, which is the anchor check: it reproduces the
+chapter's own scoring arm to four decimals. \Cref{app:p2pathcount} gives the construction in full.
+
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=\linewidth]{p2eval_pathcount.png}
+  \caption{One policy across six path counts, at fixed aggregate capacity. (a) Mean QoE against live
+  path count for the learned pair and the fixed rules, three training $\times$ three evaluation seeds
+  per point, error bars $\mathit{SD}_{\mathrm{train}}$; the checkpoints are the six-path ones throughout,
+  so this measures transfer across $N$ and not what the head would achieve if trained at each $N$.
+  (b) Transport-agent decision time against $N$: filled markers are an isolated micro-benchmark of 2000
+  timed calls per point extended to $N = 96$, hollow markers the same statistic pooled over 40{,}500
+  in-episode calls per sweep point, and the dotted line the least-squares fit to the mean, extrapolated
+  to where it meets the frame budget. Source: \texttt{rl-mpquic/runs/pc-report.json},
+  \texttt{runs/pc-decision-bench.json}.}
+  \label{fig:p2eval:pathcount}
+\end{figure}
+
+\paragraph{The architectural claim holds from four paths up, and the scheduler's value grows with
+$N$.} \Cref{fig:p2eval:pathcount}(a) reports the sweep. The checkpoint loads and runs at every $N$
+without retraining or padding, and the learned pair ranks first in \textbf{all nine cells at $N = 4$, 6,
+8, and 12} --- 36 of 36 --- with a margin over the best hand-written policy of $+0.081$, $+0.070$,
+$+0.068$, and $+0.060$ against training-seed spreads of 0.013--0.021. That is the by-construction claim
+turned into a measurement.
+
+Two further readings come with it, and one is a new positive result. The transport agent's contribution
+\emph{grows with the path count}: measured as in \cref{sec:p2eval:regimes}, the QoE the scheduler adds
+over an even split runs 0.001, 0.209, 0.208, 0.462, 0.640, and 0.732 at $N = 2, 3, 4, 6, 8, 12$. (As a
+recovery ratio the same numbers read 99.8\%, 66.3\%, 67.3\%, 25.1\%, $-8.2$\%, and $-38.1$\% --- and go
+negative at eight paths, which is the same breakdown of the ratio that
+\cref{sec:p2eval:regimes} runs into.) At two paths,
+holding the total fixed gives two fat paths and an even split is already near-optimal, so disabling the
+scheduler costs nothing measurable; at twelve, an even split places \SI{1.3}{\mega\bit\per\second} on
+each and the ablation goes \emph{negative}. This is the headroom-homogeneity axis of
+\cref{sec:p2eval:regimes} traversed by a variable the scenario file does not otherwise expose, and it is
+the cleanest demonstration of that mechanism in the chapter. The second reading is where the ranking
+breaks and why: at $N = 2$ the learned pair is first in only 4 of 9 cells and at $N = 3$ in 8 of 9. With
+two fat paths there is almost no scheduling decision to make, so the learned split's extra degrees of
+freedom buy nothing while its higher bitrate costs something. $N = 2$ is the lower edge of the
+architecture's useful range rather than a failure of it --- it is the regime in which the scheduler was
+not needed. QoE peaks at $N = 4$ and declines to $N = 12$ by 0.104, which is expected under a fixed
+total: more paths at constant capacity means thinner paths, more churn events per episode, and more ways
+for a share to land on a dying one.
+
+\paragraph{The flat head cannot be evaluated off its training path count at all.} The same load test
+run against the flat checkpoints fails at every $N \neq 6$, with a hard shape error at \emph{both} ends
+of the network: at $N = 12$ the first layer is $256 \times 34$ in the checkpoint against $256 \times 64$
+in the model, because the flat observation's \emph{width} is a function of $N$, and the two output heads
+are $6 \times 256$ against $12 \times 256$. Padding to a fixed maximum path count would paper over the
+output layer and not over the input. This sharpens the ablation above: the flat head does not merely
+score 0.231 lower on the six-path scenario, it cannot be run on any other path count. The scoring
+policy, by contrast, is 69,122 parameters at every $N$ from 2 to 96 --- the parameter-independence claim
+measured rather than asserted.
+
+\paragraph{Path-count invariance is not capacity invariance.} A contrast sweep holds each path's rate at
+its nominal value instead, so aggregate capacity scales with $N$ from \SI{5.5}{\mega\bit\per\second} at
+two paths to \SI{31}{\mega\bit\per\second} at twelve (\cref{fig:p2eval:pathcountperpath}). The two
+sweeps disagree at small $N$, and the disagreement is the result. Under the fixed total the policy is
+fine at $N = 2$ (0.577, first in 4 of 9 cells); under fixed per-path rates it \emph{collapses} to
+$-0.483$, first in 0 of 9, with a training-seed spread of 0.316 --- twenty-four times its nominal
+0.013. The variable that separates the two is not the path count but the aggregate capacity: at a third
+of the capacity the checkpoints trained on, the application agent keeps asking for a bitrate the network
+cannot carry and QoE goes negative for the learned pair and its app-only ablation alike. Above the
+training point the policy is untroubled, ranking first in 9 of 9 cells at $N = 8$ and $N = 12$, at
+twelve with the tightest spread in either sweep. Path-count invariance is therefore supported and
+capacity invariance is refuted; they are separate properties and the first must not be read as implying
+the second. The failure mode is the same one \cref{sec:p2eval:regimes} finds on the harsh held-out
+environment, reached along a different axis --- in both cases it is the application agent that breaks
+first.
+
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=0.62\linewidth]{p2eval_pathcount_perpath.png}
+  \caption{The contrast sweep: the same checkpoints, with each path's rate held at its nominal value so
+  that aggregate capacity scales with $N$ (\SIrange{5.5}{31}{\mega\bit\per\second}). Compare
+  \cref{fig:p2eval:pathcount}(a), which holds the aggregate fixed. The collapse at $N = 2$ and $N = 3$
+  is a capacity effect, not a path-count effect: the policy trained at \SI{15.5}{\mega\bit\per\second}
+  does not transfer down to a third of that. Source: \texttt{rl-mpquic/runs/pc-report.json}.}
+  \label{fig:p2eval:pathcountperpath}
+\end{figure}
+
+\paragraph{Decision cost is a large constant plus a small term in $N$, which corrects this chapter's own
+extrapolation.} \Cref{fig:p2eval:pathcount}(b) measures the split decision at
+$N \in \{2, 3, 4, 6, 8, 12\}$ inside full episodes and at
+$N \in \{6, 12, 24, 48, 96\}$ in an isolated micro-benchmark, both with warm-up discarded and both
+timing the same span the chapter times elsewhere. The two agree. Least squares over
+$N \in [2, 96]$ gives
+\begin{equation}
+t(N) = 0.483 + 0.00501\,N\ \text{ms}, \qquad R^2 = 0.990,
+\label{eq:p2decisionfit}
+\end{equation}
+so the cost is indeed linear in the path count --- but \textbf{94\% of it at six paths is the constant},
+and the marginal cost of a path is \SI{5.0}{\micro\second}. The frame budget is therefore reached near
+$N \approx 6500$, not the ${\approx}200$ this chapter previously inferred from the same
+\SI{0.507}{\milli\second} mean by assuming the cost was proportional to $N$. The correction is in the
+conservative direction and the right sentence is not ``linear in $N$'' but ``a fixed
+${\approx}\SI{0.48}{\milli\second}$ plus \SI{5}{\micro\second} per path''.
+
+The tail deserves stating separately, because a real-time claim is a claim about tails. In-episode the
+99th percentile is \SIrange{0.68}{0.86}{\milli\second} at every $N$, and over the micro-benchmark's
+wider range it has no measurable dependence on the path count at all: the same least-squares fit applied
+to the 99th percentile returns $R^2 = 0.058$, so its extrapolated crossover is not a number worth
+quoting. The 99.9th percentile is \SIrange{3.2}{3.6}{\milli\second}, still tenfold inside the budget.
+The \emph{extreme} tail is not: at every sweep point, $N = 2$
+included, the slowest single call is \SIrange{170}{219}{\milli\second} and about 0.01\% of frames exceed
+\SI{33.3}{\milli\second}. That rate does not grow with $N$ and appears identically in the isolated
+benchmark at a twentieth of the sample count, which is what one expects of a Python-runtime artifact ---
+allocation and garbage collection --- rather than of model cost. It will not be fixed by shrinking the
+network, and a deployment would need a pre-allocated inference path to remove it. A deployment claim
+should quote the 99th percentile \emph{and} disclose the one-in-$10^4$ overrun, not the mean alone.
+
+\paragraph{What bounds this.} Three limits. The measurement is on the analytical backend, so
+\cref{sec:p2eval:ns3}'s decorrelation means none of it is evidence about the packet-level body at a
+different $N$. The checkpoints are the six-path ones throughout, so this measures \emph{transfer} across
+$N$ --- which is the architectural claim --- and not what the head would achieve if trained at each $N$.
+And $N = 2, 3, 4$ carry no shared-bottleneck group, so their difficulty differs from the larger counts
+along an axis other than the path count.
+
 \subsection{What the Retractions Have in Common}
 \label{sec:p2eval:seeds}
 
-Four results in this chapter looked clean when read from a single training run and did not survive being
-run three times. The static scenario's reward comparison was stable and became unstable
+Five results in this chapter looked clean at one sampling of the training seed and did not survive a
+larger one. Four broke between one seed and three. The static scenario's reward comparison was stable
+and became unstable
 (\cref{sec:p2eval:regimes}). Intent specialization held in two of three columns and became detectable in
 none (\cref{sec:p2eval:transfer}). The learned pair ranked first on the packet-level backend and became
 one of two clusters (\cref{sec:p2eval:ns3}). Global-only conditioning was predicted to be inert and
@@ -1203,10 +1589,24 @@ follows directly and is the methodological position of \cref{sec:p2eval:setup} s
 policy is a draw from a learner, the learner is the thing under test, so report the spread over training
 runs and not only over evaluation episodes.
 
+A fifth result belongs with the four, and it is a different failure. \Cref{sec:p2eval:conditioning}'s
+interpolation tie-breaker looked clean at three training seeds, survived being run at six on its
+\emph{pooled} statistic, and fell apart when that statistic was decomposed per training seed: two of six
+global-only policies trend in the opposite direction, which a Spearman $\rho$ of 0.800 computed over the
+pooled sweep conceals entirely. Nothing was under-sampled and nothing was backend-specific. The summary
+statistic was simply computed over the wrong axis first, and pooling across seeds before checking sign
+consistency turns ``four runs agree and two disagree'' into one confident-looking number. The rule that
+catches it is the same one this section already applies to QoE --- report the per-seed values, not only
+their aggregate --- which is why the sweep records them.
+
 Two corollaries are less comfortable and belong with it. First, more seeds buy resolution, not
 reliability: doubling from three to six training seeds improved the estimates and did not reduce the
 spread (\cref{sec:p2eval:conditioning}). On this problem the learner is genuinely inconsistent run to
-run, and \cref{sec:p2eval:ns3} shows what that costs where it matters most. Second, and sharper, the
+run, and \cref{sec:p2eval:ns3} shows what that costs where it matters most. The one intervention that
+did shrink the spread was not statistical but mechanical --- closing the observation-normalizer channel
+of \cref{tab:p2fixednorm} moved it from 0.041 to 0.024 and from 0.054 to 0.010 --- which is consistent
+with the reading above: the spread is a property of the learner and its inputs, and it moves when one of
+those changes, not when the estimate of it improves. Second, and sharper, the
 sampling remedy does not always exist. The mock--NS-3 decorrelation of \cref{tab:p2seeds} is not
 insufficient sampling: over six seeds the mock's own spread is 0.008 and its rank correlation with the
 packet-level body is $-0.086$, so \emph{no} amount of mock evaluation identifies which checkpoint
@@ -1216,28 +1616,47 @@ the claim is about.
 \subsection{Summary}
 \label{sec:p2eval:summary}
 
-Five claims survive this evaluation, and three do not.
+Six claims survive this evaluation, and four do not.
 
-The learned pair beats every one of seven comparison points under all three application intents on the
-analytical backend, with stable rankings and margins of 11.5--21.4\% over the strongest hand-written
-policy, a WebRTC-style deployed stack. The permutation-equivariant path head is what makes that possible:
-substituting a flat one costs 0.231 QoE and drops the learned pair from first place in nine of nine
-cells to none. A single policy conditioned on the application's intent matches the best specialist under
-all three intents, at a third of the training cost, and adapts continuously across the space between
-them. The scheduler's contribution scales with both the heterogeneity of path headroom and the
-strictness of the application's intent --- the second being the axis this chapter shares with
-\cref{ch:single_path}. And \cref{prop:p2cancel} holds exactly for additively separable scorers,
-discharging for that function class the claim that the cancellation of \cref{ch:single_path} covers
-softmax as well as argmax selectors.
+The learned pair beats every one of eight comparison points under all three application intents on the
+analytical backend, with stable rankings and margins of $+0.065$, $+0.118$, and $+0.143$ QoE over the
+strongest hand-written policy, a WebRTC-style deployed stack, against training-seed spreads of
+0.018--0.023. The permutation-equivariant path head is what makes that possible: substituting a flat one
+costs 0.231 QoE and drops the learned pair from first place in nine of nine cells to none. That head
+also delivers what it was adopted for --- one policy, six path counts from two to twelve, no retraining
+and no padding, first in nine of nine cells at every count from four up, at a parameter count that does
+not move between two paths and ninety-six --- where the flat head cannot be loaded at any path count but
+its own. A single policy conditioned on the application's intent matches the best specialist under all
+three intents, at a third of the training cost, and adapts continuously across the space between them;
+the shortfall the per-path conditioned arm carried is attributable to the observation normalizer rather
+than to the conditioning scheme, and closing that channel recovers it. That policy is also the only one
+of the two designs that survives the intent \emph{changing during a call}: when the deadline tightens
+mid-connection, a specialist that cannot see the change overruns its new budget six times over for ten
+seconds, where the conditioned policy never crosses it. The scheduler's contribution
+scales with the heterogeneity of path headroom, with the number of paths it must divide a fixed capacity
+among, and with the strictness of the application's intent --- the last being the axis this chapter
+shares with \cref{ch:single_path} --- and the first and third of those interact rather than adding. And
+\cref{prop:p2cancel} holds exactly for additively separable scorers, discharging for that function class
+the claim that the cancellation of \cref{ch:single_path} covers softmax as well as argmax selectors.
 
-Three claims do not survive. Intents do not produce measurably intent-specific policies: no margin in
+Four claims do not survive, and one more is bounded rather than refuted: at six training seeds per arm
+this design resolves QoE differences no smaller than \SIrange{0.063}{0.087}{}, which is larger than
+every specialist margin it is asked about, so the conditioning parity result bounds the difference
+rather than demonstrating equivalence. Of the four that fail outright, the first is that intents do not
+produce measurably intent-specific policies: no margin in
 the transfer matrix clears its own training-seed spread. The ranking does not transfer zero-shot to the
 packet-level backend: three of six checkpoints keep first place and three do not, and mock score does
-not predict which. And global-only conditioning is not inert, as \cref{prop:p2cancel} would suggest for
+not predict which. Global-only conditioning is not inert, as \cref{prop:p2cancel} would suggest for
 a system whose scorer met its premise: a trained nonlinear encoder routes the intent past the
-cancellation, so the proposition constrains the architecture for exactly one layer.
+cancellation, so the proposition constrains the architecture for exactly one layer. And the headline
+claim is bounded by the distribution it was trained on rather than general: it holds on the nominal
+network and on a milder held-out one, and on a harsher held-out one the learned pair ranks first in zero
+of nine cells at two of three intents and scores below plain GCC. Invariance to the path count does not
+buy invariance to the capacity behind those paths.
 
-The last two are the more valuable of the negatives. Together they say that the theory identifies where
+The negatives are the more valuable half. Together they say that the theory identifies where
 conditioning must enter for a \emph{guarantee} while the experiment shows a deep encoder arriving there
-without one, and that a cheap surrogate can be an adequate training environment while being useless for
-selecting among the policies it produces. Both are stronger statements than the results they replaced.
+without one; that a cheap surrogate can be an adequate training environment while being useless for
+selecting among the policies it produces; and that a learned scheduler's advantage over hand-written
+rules is a function of the regime it is measured in, in both directions. All three are stronger
+statements than the results they replaced.

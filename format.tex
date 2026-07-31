@@ -114,3 +114,11 @@
 %
 \renewcommand{\topfraction}{1.0}    % Figures can appear at start of page
 \renewcommand{\bottomfraction}{1.0} % Figures can appear at end of page
+% Chapter 5 carries six full-width floats in one section; with the defaults they
+% queue up and all land after the text that discusses them. Raise the per-page
+% allowance and lower the text minimum so a float can be placed where it is cited.
+\setcounter{topnumber}{3}
+\setcounter{bottomnumber}{2}
+\setcounter{totalnumber}{4}
+\renewcommand{\textfraction}{0.05}
+\renewcommand{\floatpagefraction}{0.65}

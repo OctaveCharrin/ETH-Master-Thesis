@@ -45,9 +45,11 @@ Multipath TCP mechanisms of RFC~8684~\cite{RFC8684}, do not address.
 \gap{this section discusses the two learned multipath schedulers and omits the non-learned ones the
 field actually deploys and benchmarks against --- minRTT, the default scheduler in every Multipath TCP
 and Multipath QUIC implementation, and the BLEST and ECF refinements that address its
-head-of-line-blocking failure mode. They belong here for two reasons: they are the status quo the
-learned scheduler of \cref{ch:multipath} improves on, and their absence from \cref{tab:p2results} is
-the first thing a transport reviewer will check (see the baselines gap at \cref{sec:p2eval:setup}).
+head-of-line-blocking failure mode. They belong here because they are the status quo the learned
+scheduler of \cref{ch:multipath} improves on. minRTT is now \emph{measured} against in
+\cref{tab:p2results} --- it is the strongest of the five fixed rules there, and the learned pair leads
+it by 0.139--0.250 QoE --- so this section should cite it rather than leaving the comparison
+undiscussed; BLEST and ECF remain uncompared and should be named as such.
 A second omission is larger: learned \emph{real-time} video transport is the direct neighbour of this
 thesis's second half and no work in it is cited --- Salsify's joint codec--transport control is
 essentially \cref{ch:multipath}'s premise on a single path, and the deployed-scale RL video

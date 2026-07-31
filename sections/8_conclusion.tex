@@ -26,17 +26,24 @@ method. Close behind it is an architectural lesson we had expected to be a conve
 load-bearing. Scoring each candidate with shared weights is normally adopted so that a policy can
 accommodate a variable action set; substituting a conventional fixed-dimension head costs more quality
 than any other single change we measured, and enough that the system's headline claim reverses
-outright. It is also the smaller network of the two. Whatever a dynamic-input design costs, on these
-problems it is not parameters.
+outright. It is also the smaller network of the two, on both problems, and its size does not move with
+the path count while the head it replaces cannot be loaded at a path count it was not trained on.
+Whatever a dynamic-input design costs, on these problems it is not parameters.
 
 Second, that the payoff of joint rate-and-split control is \emph{not} a fixed quantity, and that the
 variable governing it is not the one we expected. It is tempting to say such control matters when the
 network is volatile; what we measured is that it matters when path capacity is unevenly distributed
 relative to what an even split would place on each path, and that churn and bursts matter because they
 destroy that evenness rather than because motion is itself the relevant property. A stationary but
-asymmetric network defeats application-only adaptation as thoroughly as a churning one. The payoff also
+asymmetric network defeats application-only adaptation as thoroughly as a churning one, and so does
+dividing a fixed capacity among more paths. The payoff also
 scales with what the application asks for: the stricter its delay budget, the more a poor allocation
-costs.
+costs. Mapping the two axes together taught us that they are not separable --- the intents differ
+fourteen times more from one another on a harsh network than on a benign one --- and, less comfortably,
+that they bound our own headline result. The learned pair beats every hand-written policy on the network
+it trained on and on a milder one it had never seen, and loses to a plain congestion-control heuristic
+on a harsher one, with its training-seed spread rising by an order of magnitude as it goes. Where a
+learned scheduler is measured decides not only how large its advantage looks but whether it has one.
 
 Third, the thread that joins the two systems, stated with the boundary we found on it. \emph{Where}
 intent is injected matters more than \emph{that} it is injected: for a comparison-based selector, a
@@ -48,25 +55,36 @@ cancellation assumes the conditioning is additive on the terms the comparison co
 mechanisms in an ordinary architecture break that assumption, so a trained nonlinear encoder routes
 intent past a cancellation the theory says should stop it. The principle survives as a statement about
 which routings carry a guarantee rather than which happen to work, which is the form a designer can
-actually use. Both settings also taught us how much such conditioning can be worth at all: it is cheap
+actually use. One of the three mechanisms taught us something we had not gone looking for: a normalizer
+derived from the objective is a conditioning path nobody declared, and it cost real quality until we
+closed it, at which point the two routings we had been comparing turned out to be equally good. Audit
+the preprocessing for the signal you were careful about routing. Both settings also taught us how much
+such conditioning can be worth at all: it is cheap
 and it costs nothing to add, but it earns something only where the objectives genuinely conflict and
 there is headroom to exploit, and neither of our environments offered much of either.
 
-A fourth lesson is about method rather than mechanism, and we learned it the expensive way. Four results
-in this thesis were reported from a single training run and did not survive being run three times,
+A fourth lesson is about method rather than mechanism, and we learned it the expensive way. Five results
+in this thesis looked clean at one sampling of the training seed and did not survive a larger one --- four
+of them reported from a single training run and retracted at three, one of them surviving three and six
+seeds on its pooled statistic and failing when that statistic was decomposed per seed ---
 because on this problem the spread between training runs exceeds the confidence interval over evaluation
 episodes by an order of magnitude. Sampling training seeds is necessary and not sufficient: a cheap
 simulator can be faithful enough to train good policies in while being uncorrelated with the realistic
-body on which of them is good. We report the retractions as a result because the pattern is more useful
-than any of the four numbers it corrected, and because it is the one finding here that generalizes
-beyond multipath scheduling.
+body on which of them is good. Nor is it sufficient to sample seeds and then pool over them: a summary
+statistic computed across seeds before its sign is checked within them can turn ``four runs agree and
+two disagree'' into one confident-looking number. We report the retractions as a result because the
+pattern is more useful than any of the numbers it corrected, and because it is the one finding here that
+generalizes beyond multipath scheduling.
 
 \paragraph{Future work.} Several threads remain open, and much of the draft's structure is deliberately laid
 out to guide them. On the experimental side, the sharpest question is the one \cref{sec:p2eval:ns3}
 raises: whether the system \emph{learns} on the packet-level body rather than merely transferring to it,
-which matters more now that we know surrogate score does not predict packet-level rank. Alongside it,
+which matters more now that we know surrogate score does not predict packet-level rank. Two native
+training seeds are complete and both learn; a third is what would put the answer on the same evidential
+footing as the rest of the chapter. Alongside it,
 extending the seed-level statistics of \cref{ch:multipath} back to the single-path study, which still
-rests on one training seed, and testing both systems on topologies larger than those they trained on. On
+rests on one training seed, and testing both systems on topologies larger than those they trained on ---
+the path-count axis of that question is now measured and the topology-size axis is not. On
 the system side: replacing the TCP-like subflows with a real Multipath QUIC transport, and enriching the
 VMAF surrogate so quality responds to delivery conditions and not just bitrate -- a change that would also
 close the queueing-fidelity gap that makes the analytical backend blind to the variable deciding

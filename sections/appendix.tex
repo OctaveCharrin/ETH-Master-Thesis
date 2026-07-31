@@ -152,6 +152,16 @@ stratified over the three anchors of \cref{tab:p2profiles} plus a continuously s
 randomization is training-only and evaluation never resamples. Both arms are trained for six seeds at the
 budget of \cref{tab:app:p2hyper}. Source: \texttt{rl-mpquic/configs/dynamic\_intent\{,\_glob\}.yaml}.
 
+A third arm, \cref{tab:p2fixednorm}'s, is identical to the \texttt{perpath} one apart from
+\texttt{intent.obs\_norm: fixed}, which pins the latency and jitter normalizers to the G.114 and Y.1541
+constants (\SI{200}{\milli\second} and \SI{50}{\milli\second}) instead of taking them from the intent
+bundle, and so removes the second, unintended intent channel into the per-path rows. Because the
+normalizer feeds only the observation scaling --- never the reward, the deadline, or the dynamics ---
+the two arms are graded on environments that differ in no other respect, each under the normalizer it
+trained with, which is what makes the comparison paired. It is trained for three seeds at the same
+budget; three seeds concurrent took 3\,h\,07 wall-clock. Source:
+\texttt{rl-mpquic/configs/dynamic\_intent\_fixednorm.yaml}.
+
 \gap{state the static-scenario topology alongside these once \cref{sec:p2eval:regimes} settles which
 static configuration the chapter reports. Two exist in the implementation and they are not
 interchangeable: an asymmetric three-path topology (8/4/\SI{2}{\mega\bit\per\second}), on which an even
@@ -180,13 +190,93 @@ roughly 111~episodes per intent for the conditional agents; these per-intent cur
 the two probe-frugality profiles of \cref{tab:app:profiles} appear, since \cref{sec:p1eval:setup}
 excludes them from the conditioning studies.
 
-\gap{two further sets of supplementary plots. (i) Per-intent path-choice distributions for the
-single-path selector. (ii) Multipath training curves --- per-episode QoE, loss, and VMAF for the learned
-pair under each of the three intents --- which are the counterpart of \cref{fig:app:training} and are
-already recorded in the \texttt{history} array of every \texttt{rl-mpquic/runs/*/stats.json}. The
-attention-pool seed collapse discussed in \cref{sec:p2eval:ablation} is visible in those curves and is
-worth showing, since a training curve is the most direct evidence that a training-seed spread is a
-collapse rather than noise.}
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\linewidth]{p2app_training_curves.png}
+  \caption{Training curves for the multipath agents of \cref{sec:p2impl:agents}: per-episode application
+  QoE, frame-loss fraction, and VMAF over the 100~episodes of each run, smoothed with a five-episode
+  moving average, one line per training seed. The first three columns are the per-intent specialists of
+  \cref{tab:p2results}, whose three seeds are tight enough to overplot; the fourth is the attention-pool
+  arm of \cref{sec:p2eval:ablation}, whose third seed is the reason that arm's training-seed spread is
+  0.151 against the mean-pool's 0.013. That seed tracks the other two for roughly 25~episodes, diverges
+  into a loss excursion peaking near 0.44, and recovers only partially by episode 100 while its VMAF
+  decays from 80 to below 60. A training curve is the most direct evidence available that a
+  training-seed spread is a collapse rather than noise, which is why the arm is reported rather than
+  dropped. Source: the \texttt{history} array of \texttt{rl-mpquic/runs/*/stats.json}.}
+  \label{fig:app:p2training}
+\end{figure}
+
+\Cref{fig:app:p2training} is the multipath counterpart of \cref{fig:app:training} and substantiates two
+claims from \cref{ch:multipath}. The three intent specialists converge within roughly 40~episodes and
+their three seeds are visually indistinguishable thereafter, which is what a training-seed spread of
+0.018--0.023 looks like; the attention-pool arm shows what 0.151 looks like, and the shape --- a clean
+start, an abrupt divergence, a partial recovery --- is a collapse and not a slower learner.
+
+\gap{one further set of supplementary plots: per-intent path-choice distributions for the single-path
+selector.}
+
+\section{Multipath System: The Path-Count Sweep}
+\label{app:p2pathcount}
+
+The path-count study of \cref{sec:p2eval:pathcount} sweeps $N \in \{2, 3, 4, 6, 8, 12\}$ against
+checkpoints trained at $N = 6$. \Cref{tab:app:p2pathcount} states how each configuration was built,
+because the construction is what keeps the sweep a measurement of the path count rather than of the
+bandwidth behind it. Everything not listed --- video, episode, reward, learner, and the four
+non-stationary mechanisms with their hazard rates --- is copied unchanged from the nominal configuration
+of \cref{tab:app:p2topo}, and the $N = 6$ entry of the primary sweep is config-object-identical to it.
+
+\begin{table}[h]
+  \centering
+  \caption{Construction of the path-count sweep (\cref{sec:p2eval:pathcount}); the two sweeps differ
+  only in how per-path rates are set. Source:
+  \texttt{rl-mpquic/\allowbreak scripts/\allowbreak make\_pathcount\_configs.py} and
+  \texttt{configs/\allowbreak pathcount/*.yaml}.}
+  \label{tab:app:p2pathcount}
+  \small
+  \begin{tabular}{@{}l p{0.58\linewidth}@{}}
+    \toprule
+    Choice & Value \\
+    \midrule
+    Role templates & the six of \cref{tab:app:p2topo} verbatim: (delay, cross-traffic fraction, nominal
+                     rate) for each of the six path characters \\
+    Subset for $N < 6$ & clean low-RTT, latency trap, congested, clean --- in that order, \emph{not} the
+                     listing order, which would give $N = 2$ two near-identical clean paths \\
+    Extension for $N > 6$ & the six roles cycle; the $k$-th repeat has its delay scaled by $1 + 0.2k$ so
+                     repeated roles stay distinguishable \\
+    Rates, \texttt{fixed\_total} & scaled so that every $N$ totals \SI{15.5}{\mega\bit\per\second}
+                     (primary sweep) \\
+    Rates, \texttt{fixed\_perpath} & nominal per path, so the aggregate is $15.5 \cdot N/6$
+                     (contrast sweep) \\
+    Minimum live paths & $\max(1, \lceil N/2 \rceil)$, i.e.\ 1/2/2/3/4/6, preserving the nominal
+                     three-of-six fraction \\
+    Shared-bottleneck groups & one per completed cycle of six: none at $N = 2, 3, 4$; one at $N = 6, 8$;
+                     two at $N = 12$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Two consequences of the fixed-total construction bound what \cref{sec:p2eval:pathcount} claims. Per-path
+rate ranges from \SI{8.45}{\mega\bit\per\second} at $N = 2$ down to \SI{1.29}{\mega\bit\per\second} at
+$N = 12$, against the ${\approx}\SI{2.5}{\mega\bit\per\second}$ the checkpoints trained on; and the
+minimum-live-path count cannot both preserve the nominal 50\% fraction and stay an integer at $N = 3$,
+where it is 2 of 3. The absence of a shared-bottleneck group at $N = 2, 3, 4$ makes those points easier
+along an axis other than the path count, which is stated in the text as well.
+
+\section{Multipath System: The Regime Sweep}
+\label{app:p2regimes}
+
+The regime map of \cref{fig:p2eval:regimemap} varies the network's harshness and nothing else. The two
+held-out configurations \texttt{dynamic\_ood\_\{mild,harsh\}.yaml} differ from the nominal one only in
+the \texttt{dynamics:} block, so the axis is built by interpolating those same six parameters ---
+\texttt{churn\_down\_rate}, \texttt{regime\_rate}, \texttt{regime\_lo}, \texttt{burst\_rate},
+\texttt{burst\_intensity}, and \texttt{corr\_intensity} --- between them. Topology, video, reward, and
+learner settings are the nominal ones throughout. The nominal configuration is not the exact midpoint of
+the two held-out ones, so it is inserted as its own row rather than synthesized, and rows r1 and r3 are
+the two half-way points. The row coordinate reported in \cref{fig:p2eval:regimemap}(b) is not that
+parameter bundle but the \emph{even} baseline's measured mean loss fraction in each cell, which runs
+0.031, 0.034, 0.039, 0.049, and 0.067 down the five rows. Source:
+\texttt{rl-mpquic/\allowbreak scripts/\allowbreak make\_regime\_configs.py} and
+\texttt{configs/\allowbreak regime\_r\{0..4\}\_*.yaml}.
 
 \section{Code and Artifact Availability}
 \label{app:artifacts}
