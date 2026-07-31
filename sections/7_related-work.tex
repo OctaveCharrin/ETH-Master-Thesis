@@ -21,14 +21,16 @@ a global network utility. Most directly related is the DQN SCION path selector o
 Bourak~et~al.~\cite{Bourak2025}, which we extend; the differences -- a variable-action scoring architecture
 and per-path intent conditioning that removes the single-objective limitation -- are the substance of \cref{ch:single_path}.
 
-\gap{add how SCION endpoints select paths \emph{today}, so the learned selector has a stated status
-quo rather than only a learned predecessor: the path policy language and path-service interface,
-and the path-aware transport APIs that expose selection to applications (PANAPI and related work).
-This is the deployed alternative to everything in \cref{ch:single_path}, and a Network Security Group
-reader will know it well enough to notice its absence. It also gives \cref{sec:p1impl:baselines}'s
-``SCION default'' heuristic a citation, which it currently lacks --- the baseline is defined in the
-implementation section by description alone. Pairs with the background gap at
-\cref{sec:background:scion}.}
+The deployed alternative deserves stating alongside the learned one. As \cref{sec:background:pathsel}
+describes, a SCION endpoint today reduces its candidate set by policy rather than by measurement: the
+path service supplies the segments, a declarative path policy filters them, and a static preference
+such as fewest AS hops breaks the remaining ties~\cite{Perrig2017}, with path-aware transport APIs
+exposing the same choice to applications. Our \emph{SCION default} baseline
+(\cref{sec:p1impl:baselines}) is that rule, with its remaining ties broken on measured latency rather
+than statically, which makes it a stronger opponent than the deployed default and not a weaker one.
+The distinction our work turns on is that all of these rank
+paths on properties that do not change with load, whereas which candidate is best in
+\cref{sec:p1design:env} changes between one hour and the next in 8.6\% of contexts.
 
 \section{Learned Congestion Control and Multipath Scheduling}
 \label{sec:rel:transport}
@@ -40,22 +42,32 @@ Multipath QUIC scheduler and Peekaboo~\cite{Wu2020} learns to schedule across he
 environments; both optimize a scheduling policy for a given, exogenous load. The multipath system's distinction is that it
 does \emph{not} treat the offered load as fixed: it co-optimizes the application's bitrate with the split, so
 the controller can relieve congestion it would otherwise create -- a coupling those schedulers, and the
-Multipath TCP mechanisms of RFC~8684~\cite{RFC8684}, do not address.
+Multipath TCP mechanisms of RFC~8684~\cite{RFC8684}, do not address. For that reason neither is used as
+a comparison point in \cref{sec:mp:eval}: neither takes the offered load as a decision, so neither can
+be dropped into this system's place without changing the problem it solves.
 
-\gap{this section discusses the two learned multipath schedulers and omits the non-learned ones the
-field actually deploys and benchmarks against --- minRTT, the default scheduler in every Multipath TCP
-and Multipath QUIC implementation, and the BLEST and ECF refinements that address its
-head-of-line-blocking failure mode. They belong here because they are the status quo the learned
-scheduler of \cref{ch:multipath} improves on. minRTT is now \emph{measured} against in
-\cref{tab:p2results} --- it is the strongest of the five fixed rules there, and the learned pair leads
-it by 0.139--0.250 QoE --- so this section should cite it rather than leaving the comparison
-undiscussed; BLEST and ECF remain uncompared and should be named as such.
-A second omission is larger: learned \emph{real-time} video transport is the direct neighbour of this
-thesis's second half and no work in it is cited --- Salsify's joint codec--transport control is
-essentially \cref{ch:multipath}'s premise on a single path, and the deployed-scale RL video
-controllers (OnRL, Loki, Concerto) are the closest published systems to what is built here. Citing
-them costs the chapter nothing --- none does multipath \emph{and} rate jointly, which is precisely the
-delta to state --- and not citing them makes the contribution look unaware of its own neighbourhood.}
+\paragraph{The fixed rules the field deploys.} Learned schedulers are the minority of what runs. The
+default in essentially every Multipath TCP~\cite{RFC8684} and Multipath QUIC~\cite{DeConinck2017}
+implementation is minRTT, which fills paths in ascending smoothed RTT, each up to its congestion
+window; it is the status quo \cref{ch:multipath} must improve on, and it is the strongest of the five
+fixed rules in \cref{tab:p2results}, which the learned pair leads by $+0.139$ to $+0.250$ QoE. Its
+known failure mode is head-of-line blocking, when bytes placed on a slower path delay a frame that the
+faster paths had already carried, and two refinements address it by predicting that delay before
+committing the bytes: BLEST~\cite{Ferlin2016} and ECF~\cite{Lim2017}. Each needs its own send-time
+model to be implemented faithfully, and we did not implement them, so the comparison in
+\cref{sec:mp:eval} is against the deployed default rather than against the best published fixed rule.
+
+\paragraph{Learned real-time video transport.} The closest published systems to \cref{ch:multipath} are
+not multipath schedulers but real-time video controllers. Salsify~\cite{Fouladi2018} couples the video
+codec to the transport so that the encoder's rate decision and the packet-scheduling decision are made
+together, which is this chapter's premise on a single path. Concerto~\cite{Zhou2019} learns to
+coordinate codec and transport for mobile video telephony, and OnRL~\cite{Zhang2020} runs
+reinforcement-learned rate control in a deployed video-telephony service at scale, which is the
+strongest existing evidence that learned control of this workload survives contact with real networks.
+None of them decides how to spread a frame across several paths: their network-side decision is a rate,
+not an allocation. That is the delta of \cref{ch:multipath} --- joint rate \emph{and} multipath split ---
+and it is also why our comparison point is a WebRTC-style GCC~\cite{Carlucci2016} stack rather than one
+of these systems, none of which is defined over a multipath connection.
 
 \subsection{Mortise: intent-driven tuning of a transport mechanism}
 The conceptual template for both parts is Mortise~\cite{Shen2026}. Mortise observes that a single
@@ -82,9 +94,24 @@ we adapt rate \emph{and} decide how to spread it across several paths, jointly.
 
 The machinery for serving many objectives with one policy comes from goal-conditioned RL -- universal value
 function approximators~\cite{Schaul2015} and hindsight relabeling~\cite{Andrychowicz2017}, which learn a
-value function jointly over states and goals. That literature is largely silent on \emph{where} in a
-network the goal should enter, because its policies are not comparison-based. Ours are, and our
-contribution is a specific insight about that gap: for a comparison-based selector, conditioning must
+value function jointly over states and goals.
+
+The more exact home for this thesis is \emph{multi-objective} RL, since our intent vector is a
+preference weighting over a linear scalarization rather than a target state~\cite{Roijers2013}. That
+literature already establishes what one might otherwise take to be our claim: a single network
+conditioned on the weight vector can represent the family of optima the weight simplex induces and
+generalize to weightings it never trained on, whether learned as an envelope value
+function~\cite{Yang2019} or under weights that change during execution~\cite{Abels2019}. Our
+contribution is therefore not that one conditioned policy can serve many objectives. It is narrower and
+sits where that literature does not look: MORL policies emit actions from a fixed, enumerated action
+space, in which any conditioning reaching the output layer can change the action, so nothing there asks
+\emph{where} in a \emph{comparison-based} scorer the preference must enter. That is the entire content
+of \cref{prop:p1cancel,prop:p2cancel}, and the failure it names --- a policy that consumes its objective,
+trains on it, and acts identically --- cannot arise in the architectures MORL studies. Hindsight
+relabeling does not apply to preference goals at all, since there is no achieved weight vector to
+relabel with.
+
+For a comparison-based selector, then, conditioning must
 reach the per-alternative terms, because an additive, symmetric signal cancels under the comparison. We
 establish this for both forms the comparison takes here --- under an $\arg\max$ over discrete candidates
 (\cref{prop:p1cancel}) and under a softmax over continuous allocations (\cref{prop:p2cancel}), where the
@@ -95,20 +122,13 @@ without being designed to (\cref{sec:p2eval:conditioning}). The principle is the
 which routings carry a guarantee, not about which ones happen to work. This connects a general
 representation-learning idea to a concrete failure mode in networked decision-making.
 
-\gap{the section positions the contribution against goal-conditioned RL and never mentions
-\textbf{multi-objective RL}, which is the literature this thesis is actually a member of. The intent
-vector is a preference weighting over a linear scalarization of a multi-objective reward, and the
-claim that one network can span the family of optima induced by sweeping those weights is the founding
-result of weight-conditioned MORL --- not a consequence of UVFAs, and certainly not of hindsight
-relabeling, which does not apply to preference goals at all. Cite it, and then state the delta, which
-is genuinely there and is sharper than the current framing: MORL policies emit actions from a fixed,
-enumerated action space, so nothing in that literature asks where in a \emph{comparison-based} scorer
-the preference must enter, and \cref{prop:p1cancel,prop:p2cancel} are exactly that question. Framed
-against MORL the contribution is narrow, correct and defensible; framed against goal-conditioned RL
-alone it will read to anyone in the area as a rediscovery. Relatedly, \texttt{Perez2018} (FiLM) sits
-unused in the bibliography since feature-wise modulation was measured and dropped on 2026-07-26 ---
-this is the section where that belongs, as one sentence: the obvious alternative mechanism was tried,
-tied within seed noise, and cost more parameters.}
+Once the conditioning reaches the per-alternative terms, the mechanism that carries it there appears to
+matter little. The obvious richer alternative is feature-wise modulation~\cite{Perez2018}, in which the
+objective generates per-feature scales and shifts rather than being concatenated to the features; we
+implemented and measured it, found it tied with plain concatenation within the spread between training
+seeds, and dropped it because it costs additional parameters for no measurable return. That is the
+evidence behind this thesis's claim that the finding is about \emph{where} the intent enters and not
+about the machinery that carries it once it is in the right place.
 
 \section{Intent-Based Networking}
 \label{sec:rel:ibn}

@@ -60,21 +60,82 @@ Throughout this investigation, four central puzzles guide the reader:
 This thesis makes the following explicit, verifiable contributions:
 
 \begin{enumerate}
-  \item \textbf{An intent-conditioned single-path selection framework for SCION:} We extend the DQN path selector of Bourak~et~al.~\cite{Bourak2025} with a permutation-equivariant path-scoring network and per-path intent conditioning, enabling a single policy to realize a range of application intents without per-objective retraining, and to serve intents it never trained on \emph{zero-shot}: over five training seeds, behavior interpolates smoothly and, in four of five seeds, strictly monotonically between trained objectives (Spearman $\rho = -1.000$ in four seeds and $-0.991$ in the fifth), with no seed concentrating more than 31\% of the traversed span in a single step, including on source--destination pairs never seen in training (\cref{ch:single_path}).
+  \item \textbf{An intent-conditioned single-path selection framework for SCION.} We extend the DQN
+  path selector of Bourak~et~al.~\cite{Bourak2025} with a permutation-equivariant path-scoring network
+  and per-path intent conditioning, so that one policy serves a range of application intents without
+  per-objective retraining --- including intents it never trained on. Over five training seeds behavior
+  interpolates smoothly between trained objectives, strictly monotonically in four of five, and no seed
+  concentrates more than 31\% of the traversed span in a single step (\cref{ch:single_path}).
 
-  \item \textbf{An analysis of where intent conditioning must enter:} We show analytically that a conditioning signal reaching only the terms shared by every candidate cannot change a comparison-based selection, and confirm empirically, over five training seeds with disjoint confidence intervals, that such a policy re-ranks roughly three times less than one whose conditioning reaches the per-candidate comparison (\cref{ch:single_path}).
+  \item \textbf{An analysis of where intent conditioning must enter.} We show analytically that a
+  conditioning signal reaching only the terms shared by every candidate cannot change a comparison-based
+  selection, and confirm it empirically: over five training seeds with disjoint confidence intervals,
+  such a policy re-ranks roughly three times less than one whose conditioning reaches the per-candidate
+  comparison (\cref{ch:single_path}).
 
-  \item \textbf{Verifiable probing reduction at near-oracle quality:} We demonstrate that our learned single-path selector falls short of a per-context reward oracle by at most 0.0018 reward on any evaluated intent --- while inspecting one path per decision rather than all thirty --- and, over five training seeds, outperforms every heuristic baseline on two of four intents in every seed and on three of four on the seed mean --- trailing the purpose-built heuristic on the fourth by 0.003 --- while cutting probing cost by $39.6\times$ against exhaustive bandwidth measurement and probing less than every heuristic in absolute terms. We also bound what that proximity means: the oracle's own re-ranking rate is 0.161, so most decision contexts admit no better answer under a different intent, and near-oracle performance partly reflects a task with little headroom (\cref{ch:single_path}).
+  \item \textbf{Verifiable probing reduction at near-oracle quality.} The learned selector falls within
+  0.0034 reward of a per-context oracle on the intents that discriminate while inspecting one path per
+  decision rather than all thirty --- a $39.6\times$ cut in measurement cost --- and beats every
+  heuristic baseline on two of four intents in every seed. We also bound what that proximity means: the
+  oracle's own re-ranking rate is 0.161, so most decision contexts admit no better answer under a
+  different intent (\cref{ch:single_path}).
 
-  \item \textbf{A hierarchical system for joint application--network co-optimization:} We design and implement a two-timescale hierarchical SAC framework for real-time video over Multipath QUIC, co-optimizing target bitrates and continuous path splits across NS-3 packet simulation and analytical testbeds. It beats all eight comparison points under all three application intents --- including minRTT, the default scheduler in every deployed Multipath TCP and Multipath QUIC stack, which it leads by 0.139--0.250 QoE, and a WebRTC-style deployed stack, the strongest of them, which it leads by 0.065, 0.118, and 0.143 against training-seed spreads of 0.018--0.023 --- ranking first in every evaluation cell under two intents and eight of nine under the third, and delivering higher VMAF at lower delivered latency in each case (\cref{ch:multipath}).
+  \item \textbf{A hierarchical system for joint application--network co-optimization.} We design and
+  implement a two-timescale SAC framework for real-time video over Multipath QUIC, co-optimizing target
+  bitrate and continuous path split across NS-3 packet simulation and analytical testbeds. It beats all
+  eight comparison points under all three application intents, leading a WebRTC-style deployed stack by
+  0.065, 0.118, and 0.143 QoE against training-seed spreads of 0.018--0.023, and minRTT --- the default
+  scheduler in every deployed Multipath TCP and Multipath QUIC stack --- by 0.139--0.250, at higher VMAF
+  and lower delivered latency in each case (\cref{ch:multipath}).
 
-  \item \textbf{The permutation-equivariant path head is load-bearing, not a convenience:} Scoring each candidate with shared weights is usually presented as the way to accommodate a variable action set. We show it is what makes the system work at all. Substituting a conventional fixed-dimension head, with the two configurations otherwise field-identical, costs $0.231 \pm 0.029$ QoE, positive in all nine evaluation cells against training-seed spreads of 0.013 and 0.037 --- the largest measured effect in this thesis, and enough that with the flat head the preceding contribution is simply false, the learned pair ranking first in zero of nine cells rather than nine. We then measure the property the head was adopted for, which the literature and our own design section assert by construction: one six-path policy runs unmodified at two, three, four, six, eight, and twelve live paths at fixed aggregate capacity, ranking first in all nine evaluation cells at every count from four upward, at 69,122 parameters from two paths to ninety-six --- while the flat head cannot be loaded at any path count but its own, failing at both the input and the output layer. The same architecture raises single-path goodput by 41\% over a fixed-action agent at less than half the parameter count, so on both problems the dynamic-input design is cheaper to store as well as better to run (\cref{ch:single_path,ch:multipath}).
+  \item \textbf{The permutation-equivariant path head is load-bearing, not a convenience.} Scoring each
+  candidate with shared weights is usually presented as the way to accommodate a variable action set. We
+  show it is what makes the system work at all: substituting a conventional fixed-dimension head, with
+  the two configurations otherwise field-identical, costs $0.231 \pm 0.029$ QoE and drops the learned
+  pair from first place in nine of nine evaluation cells to zero --- the largest measured effect in this
+  thesis. One six-path policy then runs unmodified at two, three, four, six, eight, and twelve live
+  paths, at 69,122 parameters from two paths to ninety-six, where the flat head cannot be loaded at any
+  path count but its own. The same architecture raises single-path goodput by 41\% over a fixed-action
+  agent at less than half the parameter count (\cref{ch:single_path,ch:multipath}).
 
-  \item \textbf{Intent conditioning extended to continuous allocation, with its premise measured:} We prove the cancellation result's softmax analogue --- for an additively separable scorer, conditioning entering only path-independent terms leaves the traffic split numerically identical, exactly rather than up to re-ranking --- and show that a single conditioned policy replaces three per-intent specialists at a third of the training cost, with no penalty detectable at the resolution these experiments achieve, adapting continuously across the space between them. We state that as the null it is, with its resolution: at six training seeds per arm the design detects nothing below 0.063--0.087 QoE, while every margin at issue is 0.048 or less, so the result bounds the difference rather than demonstrating equivalence --- and the bar itself is noise-limited, since the specialists proved not to be measurably specialized for the same reason. We also identify where conditioning is worth having operationally, which fixed-objective experiments cannot show: when the application tightens its deadline \emph{mid-call}, a specialist that cannot observe the change overruns its new budget six-fold for ten seconds, where the conditioned policy never crosses it. We then measure three mechanisms by which the deployed architecture violates the proposition's premise, so that a nonlinear encoder routes conditioning past the cancellation in practice: the result identifies which routings carry a \emph{guarantee}, not which happen to work. One of the three is not merely a caveat on a proof but a measurable cost --- an observation normalizer that is itself part of the objective sends the objective into each path's features by a second, undeclared route, and closing it recovers $+0.036$ and $+0.033$ QoE at exactly the two intents that carried a deficit, in nine and eight of nine paired cells, while tightening the training-seed spread (\cref{ch:multipath}).
+  \item \textbf{Intent conditioning extended to continuous allocation, with its premise measured.} We
+  prove the cancellation result's softmax analogue --- for an additively separable scorer, conditioning
+  entering only path-independent terms leaves the traffic split numerically identical --- and show that
+  one conditioned policy replaces three per-intent specialists at a third of the training cost, adapting
+  continuously across the space between them. We state that as the null it is: at six seeds per arm the
+  design detects nothing below 0.063--0.087 QoE while every margin at issue is 0.048 or less, so the
+  result bounds the difference rather than demonstrating equivalence. We then identify where conditioning
+  is worth having operationally, which fixed-objective experiments cannot show --- when the application
+  tightens its deadline \emph{mid-call}, a specialist that cannot observe the change overruns its new
+  budget six-fold for ten seconds where the conditioned policy never crosses it --- and measure three
+  mechanisms by which the deployed architecture violates the proposition's premise. One is not merely a
+  caveat on a proof but a measurable cost: an observation normalizer that is itself part of the objective
+  carries the objective into each path's features by a second, undeclared route, and closing it recovers
+  $+0.036$ and $+0.033$ QoE at exactly the two intents that carried a deficit (\cref{ch:multipath}).
 
-  \item \textbf{Characterization of when joint multipath control pays off:} We show the governing quantity is not network volatility but the relationship between the load an even split places on each path and that path's residual capacity, together with how strictly the application prices delay. A stationary but asymmetric topology defeats application-only adaptation as thoroughly as a churning one, while on a well-balanced topology the measured margin falls below the spread between training runs of the same method --- so the regime a scheduler is benchmarked in decides whether it can be measured at all. Mapping the two axes together over five network regimes $\times$ three intents, 135 evaluation cells in all, shows they are not separable: the three intents span 0.039 QoE on a benign network and 0.566 on a harsh one, so the marginals cannot be read additively. The same map bounds our own headline claim, which holds on the training distribution and on a milder held-out network and fails on a harsher one, where the learned pair ranks first in zero of nine cells at two of three intents and a WebRTC-style scheduler beats it in every column (\cref{ch:multipath,sec:analysis}).
+  \item \textbf{Characterization of when joint multipath control pays off.} The governing quantity is not
+  network volatility but the relationship between the load an even split places on each path and that
+  path's residual capacity, together with how strictly the application prices delay. A stationary but
+  asymmetric topology defeats application-only adaptation as thoroughly as a churning one, while on a
+  well-balanced topology the measured margin falls below the spread between training runs of the same
+  method. Mapping the two axes together over five network regimes $\times$ three intents --- 135
+  evaluation cells --- shows they are not separable: the three intents span 0.039 QoE on a benign network
+  and 0.566 on a harsh one. The same map bounds our own headline claim, which holds on the training
+  distribution and on a milder held-out network and fails on a harsher one, where a WebRTC-style
+  scheduler beats the learned pair in every column (\cref{ch:multipath,sec:analysis}).
 
-  \item \textbf{A measurement discipline for learned network control, arrived at by retraction:} Four results in this thesis were reported from a single training run and did not survive being run three times, because the spread over training seeds exceeds the confidence interval over evaluation seeds by an order of magnitude on this problem. Sampling training seeds is necessary and, we show, not sufficient in two distinct ways. Across six independently trained policies the analytical backend's ranking is uncorrelated with the packet-level backend's ($\rho = -0.086$, the best surrogate checkpoint being the worst on the packet-level body), so a cheap surrogate can be an adequate training environment while carrying no information for selecting among the policies it produces. And a fifth result survived six seeds on its pooled statistic and failed once that statistic was decomposed per seed, two of six runs trending the opposite way behind a pooled Spearman $\rho$ of 0.800 --- so seeds must be sampled, graded on the backend the claim is about, and read individually before they are pooled (\cref{ch:multipath}).
+  \item \textbf{A measurement discipline for learned network control, arrived at by retraction.} Four
+  results in this thesis were reported from a single training run and did not survive being run three
+  times, because the spread over training seeds exceeds the confidence interval over evaluation seeds by
+  an order of magnitude on this problem. Sampling training seeds is necessary and, we show, not
+  sufficient in two distinct ways. Across six independently trained policies the analytical backend's
+  ranking is uncorrelated with the packet-level backend's ($\rho = -0.086$, the best surrogate checkpoint
+  being the worst on the packet-level body), so a cheap surrogate can be an adequate training environment
+  while carrying no information for selecting among the policies it produces. And a fifth result survived
+  six seeds on its pooled statistic and failed once that statistic was decomposed per seed, two of six
+  runs trending the opposite way behind a pooled Spearman $\rho$ of 0.800 --- so seeds must be sampled,
+  graded on the backend the claim is about, and read individually before they are pooled
+  (\cref{ch:multipath}).
 \end{enumerate}
 
 \section{Organization}
@@ -88,15 +149,16 @@ The remainder of this thesis is organized as follows:
 \Cref{ch:single_path} presents our study on intent-conditioned single-path selection, detailing its scoring architecture, the conditioning result and its proof, and the performance limits it exposes.
 \Cref{ch:multipath} expands into joint application--network optimization over multipath, detailing the two-timescale SAC architecture and evaluation across dynamic network regimes.
 
-\gap{say here, where the reader forms expectations about what each chapter contains, that the two
-studies do not share a substrate. \Cref{ch:single_path} runs on a generated SCION topology with
-beaconing, segments, and a path store; \cref{ch:multipath} runs on a hand-specified six-path
-configuration (\cref{tab:app:p2topo}) with no SCION control plane at all, using only the path
-multiplicity SCION provides. This is a defensible scoping decision --- the multipath question is about
-transport and application control, not about path discovery --- but leaving it implicit invites the
-reader to assume a continuity of environment that does not exist, and to be surprised in
-\cref{sec:mp:impl}. One sentence here, and the corresponding one in \cref{ch:multipath}'s opening,
-settle it.}
+The two studies do not share a substrate, and it is worth saying so where the reader forms expectations
+rather than leaving it to be discovered. \Cref{ch:single_path} runs on a generated SCION topology with
+beaconing, segments, and a path store, so its candidate sets are the ones a SCION control plane would
+produce. \Cref{ch:multipath} runs on a hand-specified six-path configuration
+(\cref{tab:app:p2topo}) with no SCION control plane at all: it assumes the \emph{path multiplicity} a
+path-aware architecture makes routine, and studies what an endpoint should do with it. That is a
+deliberate scoping decision, since the multipath question is about transport and application control
+rather than path discovery, and it makes those results portable to any multipath substrate --- but it
+also means the natural union of the two halves, a learned selector feeding a learned scheduler, is
+untested here (\cref{ch:conclusion}).
 
 \Cref{ch:synthesis} unifies the findings, analyzing overhead, scalability, generalization, and deployment considerations (\cref{sec:analysis,sec:discussion}).
 \Cref{ch:related} places our work within the broader research landscape, and \Cref{ch:conclusion} concludes.

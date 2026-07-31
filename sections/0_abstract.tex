@@ -2,67 +2,37 @@
 \addcontentsline{toc}{chapter}{Abstract}
 
 The Internet forwards packets without regard for why they were sent, so the network optimizes a target
-that rarely matches what an application actually values. Path-aware architectures such as SCION change
-this by letting endpoints choose among multiple end-to-end paths, placing the path decision in the hands
-of the one party that knows the application's intent. This thesis studies how to make that choice well:
-how to select the best path -- or the best combination of paths -- given both the application's intent and
-the current state of the network. We build two learned controllers to answer it, at two granularities:
-a single-path selector for general flows, and a joint controller for real-time video that decides how
-much traffic each path carries \emph{and} what the application produces. Both take a single idea from
-recent congestion-control work -- that application intent should be a first-class input which reshapes
-a network mechanism rather than a constant compiled into it -- and carry it one layer deeper than it
-has been taken before.
+that rarely matches what an application values. Path-aware architectures such as SCION let endpoints
+choose among multiple end-to-end paths, placing that decision with the party that knows the
+application's intent. This thesis asks how to make it well, at two granularities: choosing one path for
+general flows, and, for real-time video, jointly choosing how much traffic each path carries
+\emph{and} what the application produces.
 
 The strongest result is that the two decisions cannot be made well apart. A two-timescale pair of
 reinforcement-learning agents co-optimizing a video call's encoding bitrate and its per-path split over
-Multipath QUIC beats all eight comparison points under all three application intents -- including
-minRTT, the scheduler every Multipath QUIC implementation ships, and a WebRTC-style deployed stack --
-by 0.065 to 0.143 QoE over the strongest of them, three to seven times the spread between training
-runs of the same method, and removing either agent forfeits most of the achievable quality. What makes
-this possible is architectural rather than incidental: a permutation-equivariant head that scores each
-path with shared weights, so one policy serves any number of paths. Substituting a conventional
-fixed-dimension head costs 0.231 QoE and drops the system from first place in nine of nine evaluation
-cells to none, which makes it the largest measured effect in this thesis, and the substitute cannot even
-be loaded at a path count other than the one it trained on, where the shared-weight policy runs
-unmodified from two paths to twelve at a parameter count that does not move. The same
-architecture carries the single-path study, where it raises residual bottleneck capacity by 41\% over a
-fixed-action control at less than half the parameter count, and brings a learned selector to within
-0.002 reward of a per-context oracle while probing one path per decision instead of thirty.
+Multipath QUIC beats all eight comparison points under all three application intents --- among them
+minRTT and a WebRTC-style deployed stack --- by 0.065 to 0.143 QoE, three to seven times the spread
+between training runs; removing either agent forfeits most of the achievable quality. What makes this
+possible is architectural: replacing the permutation-equivariant head that scores every path with shared
+weights by a fixed-dimension one costs 0.231 QoE and drops the system from first in nine of nine
+evaluation cells to none, where the shared-weight policy runs unmodified from two paths to twelve
+at a fixed parameter count. The same architecture carries the single-path study, raising residual
+bottleneck capacity by 41\% at under half the parameter count, on one probe per decision instead of
+thirty.
 
-Intent conditioning is the thread that connects the two, and its honest form is a design lemma with a
-measured boundary. We show analytically that \emph{where} the conditioning enters decides whether it
-has any effect at all: a signal reaching only the terms shared by every candidate cancels under the
-comparison that selects a path, exactly and on the entire action when that comparison is a softmax,
-however much the policy is trained on it. Routing it into the per-candidate comparison instead lets one
-policy serve a range of intents without retraining, including intents it never trained on, and in the
-multipath setting lets one policy replace three separately trained specialists at a third of the
-training cost with no penalty detectable at the resolution our experiments achieve. But the guarantee
-is narrower than the behavior. The cancellation is exact only for scorers additively separable in the
-conditioning, and we measure three ways an ordinary deployed architecture violates that premise, so
-that a trained nonlinear encoder routes intent past a cancellation the theory says should stop it. The
-principle survives as a statement about which routings carry a guarantee, not which happen to work.
-Both settings also bound how much such conditioning can be worth: intents must genuinely conflict, and
-in the single-path environment loss is near zero on 99\% of selections, leaving goodput against latency
-as the one axis on which alignment can be demonstrated.
+Intent conditioning is the thread joining the two, and it comes with a boundary. \emph{Where} the
+conditioning enters decides whether it acts at all: a signal reaching only the terms shared by every
+candidate cancels under the comparison that selects a path --- exactly, and on the whole action, when
+that comparison is a softmax. Routed into the per-candidate comparison, one policy serves intents it
+never trained on and replaces three separately trained specialists at a third of the cost. But three
+mechanisms in an ordinary architecture violate that premise, so a trained encoder routes intent past a
+cancellation the theory says should stop it: the principle identifies which
+routings carry a guarantee, not which happen to work.
 
-We report where the results do not reach, and two of those findings are more useful than what they
-replaced. What governs the payoff of joint control is not whether the network is moving but how
-unevenly capacity is spread across the paths and how strictly the application prices delay -- a
-stationary but asymmetric network defeats application-only adaptation as thoroughly as a churning one,
-and the two axes interact rather than adding, the three intents differing fourteen times more on a harsh
-network than on a benign one. The same map bounds the headline claim: it holds on a milder held-out
-network and fails on a harsher one, where a hand-written scheduler wins every column.
-And on a packet-level backend the ranking transfers for three of six independently trained policies and
-not the other three, with analytical-backend score uncorrelated with which, so a cheap surrogate can be
-an adequate training environment while being useless for selecting among the policies it produces. Four
-results in this thesis were reported from a single training run and did not survive being run three
-times; we report that pattern as a result, because on this problem the spread between training runs
-exceeds the confidence interval over evaluation episodes by an order of magnitude. Together the two
-parts argue that on a path-aware Internet, application intent should steer every controllable decision
-between the application and the wire, and they chart what remains to make such control deployable.
-
-\gap{one scope sentence to add once you are happy with the wording above: the multipath study assumes
-the path multiplicity a path-aware architecture provides rather than running on a SCION data plane --
-there is no beaconing, path store, or segment composition in \cref{ch:multipath}, and the six-path
-topology is hand-specified (\cref{tab:app:p2topo}). Given the title, a SCION-group reader will ask, and
-it is better answered here in one clause than discovered in \cref{sec:mp:impl}.}
+What governs the payoff of joint control is not whether the network is moving but how unevenly capacity
+is spread across paths and how strictly the application prices delay --- and that map bounds our
+headline claim: it holds on a milder held-out network and fails on a harsher one. On a packet-level
+backend only three of six independently trained policies keep their ranking, and surrogate score does
+not predict which, so a cheap surrogate can be a fine training environment and a useless one for
+choosing among the policies it produces. Throughout, the single-path study runs on a generated SCION
+topology; the multipath study assumes only path multiplicity.

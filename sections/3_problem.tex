@@ -25,7 +25,8 @@ A satisfactory solution must exhibit six key properties, which also define the p
 
 For the single-path system, each of the six is measured rather than asserted:
 \cref{sec:p1eval:intent} for Intent Alignment, \cref{sec:p1eval:zeroshot} for Zero-Shot Generalization,
-and \cref{sec:p1eval:dynamic} for Dynamic-Action Handling, with
+\cref{sec:p1eval:dynamic} for Dynamic-Action Handling, \cref{sec:p1eval:overhead} for Low Overhead, and
+\cref{sec:p1eval:ceiling} for behavior as the paths a flow can reach fill up, with
 \cref{sec:p1eval:ablation} reporting Structural Generalization on a disjoint set of
 source--destination pairs. One qualification applies throughout: structural generalization is
 demonstrated across pairs and candidate-set sizes within a single topology, since only one topology was
@@ -43,32 +44,27 @@ evaluated one.
   
   \item[Structural \& Topological Generalization.] Performance must hold off-distribution across unseen topologies, dynamic path counts, and shifting traffic workloads.
   
-  \item[Robustness to Network Volatility.] The policy must sustain high performance under non-stationary conditions -- path churn, sudden link failures, and transient congestion bursts -- where static heuristics fail.
+  \item[Robustness to Heterogeneous Path Headroom.] The policy must sustain high performance when the
+  load a naive allocation places on a path exceeds that path's residual capacity --- whether because
+  the paths differ in capacity to begin with, or because path churn, link failures, and transient
+  congestion bursts destroy an evenness that held a moment earlier. We state the property this way
+  rather than as robustness to volatility because \cref{sec:p2eval:regimes} finds that headroom, not
+  motion, is the governing variable: a stationary but asymmetric topology defeats a naive allocation as
+  thoroughly as a churning one, and a stationary topology of near-equal paths leaves a scheduler almost
+  nothing to earn.
 \end{description}
 
-\gap{this last property states as a requirement the thing \cref{sec:p2eval:regimes} and
-\cref{sec:disc:interpretation} explicitly \emph{refute} as the governing variable. The chapter's
-finding is that what decides whether a scheduler has anything to earn is the relationship between the
-load an even split places on each path and that path's residual capacity --- headroom heterogeneity ---
-and that churn, regime shifts, and bursts matter only because they destroy that homogeneity
-transiently. A stationary but asymmetric topology defeats application-only adaptation as thoroughly as
-a churning one, and a stationary near-equal topology leaves the scheduler nothing to do. As written,
-the problem statement sets up an expectation the results correct, and a reader arriving at
-\cref{sec:p2eval:regimes} will read the correction as a retreat rather than as a sharpening. Restate
-the property as robustness to \emph{headroom heterogeneity}, with volatility named as one mechanism
-that produces it. This also makes \cref{ch:problem} the place the thesis's second-most-interesting
-finding is foreshadowed rather than contradicted.}
-
-\gap{the property-to-measurement map above covers the single-path system only --- six properties,
-each pointed at a \cref{ch:single_path} section. Add the multipath column, since \cref{ch:multipath}
-measures five of the six and the reader has no index into them: Intent Alignment
-(\cref{sec:p2eval:transfer,sec:p2eval:conditioning}), Zero-Shot Generalization
-(\cref{sec:p2eval:conditioning}, with the caveat that interior intents are in-distribution there),
-Dynamic-Action Handling (\cref{sec:p2eval:ablation}'s flat-versus-scoring arm), Structural
-Generalization (the held-out dynamics arms), and Robustness (\cref{sec:p2eval:regimes}). Mark the one
-that is \emph{not} measured for the multipath system --- Low Overhead, whose per-frame inference cost
-is the binding real-time constraint of the entire design and is unstated in both chapters
-(\cref{sec:analysis:overhead}) --- so the omission is declared here rather than discovered.}
+The multipath system measures five of the same six properties, and the reader should have an index into
+them: Intent Alignment (\cref{sec:p2eval:transfer,sec:p2eval:conditioning}), Zero-Shot Generalization
+(\cref{sec:p2eval:conditioning}, with the caveat that the interior of the intent segment is
+in-distribution there rather than unseen), Dynamic-Action Handling
+(\cref{sec:p2eval:ablation,sec:p2eval:pathcount}), Structural Generalization (the held-out dynamics
+arms of \cref{sec:p2eval:regimes,sec:p2eval:ablation}), and Robustness to Heterogeneous Path Headroom
+(\cref{sec:p2eval:regimes,sec:p2eval:pathcount}). Low Overhead takes a different form in the two
+systems: probing cost is the binding constraint for single-path selection
+(\cref{sec:p1eval:overhead}), whereas for the multipath system it is per-frame inference latency,
+reported in \cref{sec:p2eval:ablation,sec:p2eval:pathcount} and synthesized in
+\cref{sec:analysis:overhead}.
 
 \section{Assumptions \& Scope}
 \label{sec:problem:assumptions}

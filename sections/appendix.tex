@@ -14,7 +14,7 @@ intents. \Cref{tab:app:profiles} lists the six profiles used, together with the 
 
 \begin{table}[h]
   \centering
-  \caption{The six reward profiles (application intents) used in the single-path selection study
+  \caption[The six reward profiles of the single-path study]{The six reward profiles (application intents) used in the single-path selection study
   (\cref{ch:single_path}). $w_1$ weights goodput, $w_2$ trust, $w_3$ loss and $w_4$ delay within the
   trust term, and $w_{\text{probe}}$ the probing penalty. All six are used in training on a stratified
   schedule; the four marked with a chapter label are also used in the evaluation of
@@ -42,7 +42,7 @@ intents. \Cref{tab:app:profiles} lists the six profiles used, together with the 
 
 \begin{table}[h]
   \centering
-  \caption{Hyperparameters for the single-path selection agents (\cref{ch:single_path}).}
+  \caption[Hyperparameters for the single-path agents]{Hyperparameters for the single-path selection agents (\cref{ch:single_path}).}
   \label{tab:app:p1hyper}
   \begin{tabular}{ll}
     \toprule
@@ -86,7 +86,7 @@ scenario parameters.
 
 \begin{table}[h]
   \centering
-  \caption{Soft actor-critic hyperparameters shared by the application and transport agents
+  \caption[Soft actor-critic hyperparameters, multipath system]{Soft actor-critic hyperparameters shared by the application and transport agents
   (\cref{sec:p2impl:agents}). Source: \texttt{rl-mpquic/configs/dynamic.yaml}.}
   \label{tab:app:p2hyper}
   \begin{tabular}{ll}
@@ -112,7 +112,7 @@ scenario parameters.
 
 \begin{table}[h]
   \centering
-  \caption{The dynamic six-path scenario (\cref{sec:p2eval:setup}): per-path bottleneck rate,
+  \caption[The dynamic six-path scenario]{The dynamic six-path scenario (\cref{sec:p2eval:setup}): per-path bottleneck rate,
   propagation delay, and mean cross-traffic as a fraction of that rate. No path can carry full-quality
   video alone. Paths~5 and~6 form a shared-bottleneck group that degrades together. Source:
   \texttt{rl-mpquic/configs/dynamic.yaml}.}
@@ -162,12 +162,15 @@ trained with, which is what makes the comparison paired. It is trained for three
 budget; three seeds concurrent took 3\,h\,07 wall-clock. Source:
 \texttt{rl-mpquic/configs/dynamic\_intent\_fixednorm.yaml}.
 
-\gap{state the static-scenario topology alongside these once \cref{sec:p2eval:regimes} settles which
-static configuration the chapter reports. Two exist in the implementation and they are not
-interchangeable: an asymmetric three-path topology (8/4/\SI{2}{\mega\bit\per\second}), on which an even
-split overdrives the weakest path and app-only collapses, and a near-equal four-path topology, on which
-app-only comes within 2\% of the full system. The chapter's argument in \cref{sec:p2eval:regimes} turns
-on the difference, so both belong in this table with their headroom spread stated explicitly.}
+\paragraph{The two static scenarios.} \Cref{sec:p2eval:regimes} contrasts two stationary
+configurations, and they are not interchangeable, so both are stated here. The \emph{asymmetric} one
+has three paths at 8, 4, and \SI{2}{\mega\bit\per\second}, a four-fold spread: an even split places a
+third of the load on a path holding an eighth of the capacity, so the weakest path is overdriven
+continuously and the app-only ablation collapses even though nothing in the network moves. The
+\emph{near-equal} one has four paths of comparable rate, so an even split fits inside every path's
+residual capacity and app-only comes within 2\% of the full system. Neither enables any of the four
+non-stationary mechanisms. The pair is what isolates headroom heterogeneity from motion: the network
+is stationary in both, and only the spread of capacity across paths differs.
 
 \section{Supplementary Results}
 \label{app:extra}
@@ -175,7 +178,7 @@ on the difference, so both belong in this table with their headroom spread state
 \begin{figure}[h]
   \centering
   \includegraphics[width=\linewidth]{p1app_training_curves.png}
-  \caption{Training curves for the single-path agents of \cref{sec:p1impl:agents}: episode reward
+  \caption[Training curves for the single-path agents]{Training curves for the single-path agents of \cref{sec:p1impl:agents}: episode reward
   (25-episode moving average, left) and training loss (right) over the 533 or 666~episodes each agent was
   trained for. The four path-scoring agents converge to within 0.01 of one another at roughly $+0.81$,
   while the flat DQN plateaus near $+0.05$ with a \emph{rising} loss despite the identical budget, data,
@@ -193,7 +196,7 @@ excludes them from the conditioning studies.
 \begin{figure}[h]
   \centering
   \includegraphics[width=\linewidth]{p2app_training_curves.png}
-  \caption{Training curves for the multipath agents of \cref{sec:p2impl:agents}: per-episode application
+  \caption[Training curves for the multipath agents]{Training curves for the multipath agents of \cref{sec:p2impl:agents}: per-episode application
   QoE, frame-loss fraction, and VMAF over the 100~episodes of each run, smoothed with a five-episode
   moving average, one line per training seed. The first three columns are the per-intent specialists of
   \cref{tab:p2results}, whose three seeds are tight enough to overplot; the fourth is the attention-pool
@@ -212,9 +215,6 @@ their three seeds are visually indistinguishable thereafter, which is what a tra
 0.018--0.023 looks like; the attention-pool arm shows what 0.151 looks like, and the shape --- a clean
 start, an abrupt divergence, a partial recovery --- is a collapse and not a slower learner.
 
-\gap{one further set of supplementary plots: per-intent path-choice distributions for the single-path
-selector.}
-
 \section{Multipath System: The Path-Count Sweep}
 \label{app:p2pathcount}
 
@@ -227,7 +227,7 @@ of \cref{tab:app:p2topo}, and the $N = 6$ entry of the primary sweep is config-o
 
 \begin{table}[h]
   \centering
-  \caption{Construction of the path-count sweep (\cref{sec:p2eval:pathcount}); the two sweeps differ
+  \caption[Construction of the path-count sweep]{Construction of the path-count sweep (\cref{sec:p2eval:pathcount}); the two sweeps differ
   only in how per-path rates are set. Source:
   \texttt{rl-mpquic/\allowbreak scripts/\allowbreak make\_pathcount\_configs.py} and
   \texttt{configs/\allowbreak pathcount/*.yaml}.}
@@ -281,15 +281,25 @@ parameter bundle but the \emph{even} baseline's measured mean loss fraction in e
 \section{Code and Artifact Availability}
 \label{app:artifacts}
 
-\gap{write this section, which the thesis currently lacks entirely. \Cref{ch:multipath}'s tables are
-scrupulous about citing the artifact behind every number --- \texttt{rl-mpquic/runs/ab-prof2-ev*-tr*/\allowbreak
-ab\_summary.json} and its siblings appear in six captions --- and there is nowhere in the document
-that says where \texttt{rl-mpquic} \emph{is}. State the repository and the commit hash that produced
-the reported results, the same for the single-path codebase, and the software versions that matter
-(Python, PyTorch, NS-3 and ns3-ai). Then give the mapping from each table and figure to the run
-directory backing it; the material already exists in \texttt{rl-mpquic/docs/RESULTS.md}, which is
-organized exactly this way, so this is a transcription rather than an authoring task. Note also which
-results cannot be reproduced from the artifacts alone --- the NS-3 arms need a built simulator, and
-the checkpoints are not in version control --- so the claim made here is accurate. Both examiners and
-anyone building on this will look for this section first; its absence is the kind of thing that reads
-as carelessness in a document that is otherwise unusually careful about provenance.}
+Two codebases produce every number in this thesis. The single-path selector of \cref{ch:single_path} is
+implemented in one repository holding the topology generator, the beaconing and traffic simulators, the
+agent family of \cref{sec:p1impl:agents}, and the six-stage pipeline of \cref{sec:p1impl:pipeline}. The
+multipath system of \cref{ch:multipath} is implemented in a second, \texttt{rl-mpquic}, holding the two
+data-plane backends, the agent pair, the evaluation harness, and the configuration files cited
+throughout that chapter.
+
+\gap{insert the two repository URLs and the commit hash of each that produced the reported results,
+together with the versions of Python, PyTorch, NS-3, and ns3-ai used. These are the only facts this
+section still needs.}
+
+Every table and figure in \cref{ch:multipath} names the run directory behind it in its caption, and
+those directories live under \texttt{rl-mpquic/runs/}; \texttt{rl-mpquic/docs/RESULTS.md} maps each
+reported result to the command that produced it, and the single-path pipeline writes the equivalent
+artifacts into one timestamped run directory per invocation (\cref{sec:p1impl:pipeline}). Three limits
+on reproducibility belong with that. The trained checkpoints are not under version control, so results
+can be regenerated by retraining but not by replaying our exact weights. The NS-3 arms additionally
+require a built simulator with the ns3-ai shared-memory bridge, and cannot be run concurrently, for the
+reason given in \cref{sec:p2eval:ns3}. And because the spread over training seeds exceeds the
+evaluation-seed interval by an order of magnitude on this problem (\cref{sec:p2eval:seeds}), a
+reproduction should be read against the reported training-seed spreads rather than against the reported
+means.

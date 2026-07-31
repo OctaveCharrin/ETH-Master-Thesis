@@ -17,113 +17,94 @@ earns its keep.
 \subsection{Interpretation}
 \label{sec:disc:interpretation}
 
-\paragraph{Intent conditioning turns a family of policies into one.} The central lesson of
-\cref{ch:single_path} is that the right way to serve many objectives is not many models but one model that
-takes the objective as input -- provided the objective reaches the part of the network that actually
-decides. \Cref{prop:p1cancel} is the crisp version of this point: a conditioning signal that enters
-identically across the alternatives cancels under the comparison that picks the action, so the policy can
-look conditioned while behaving identically. Supplying the objective to the per-path terms avoids this,
-because the objective can then interact with each candidate's own feature values and change which one
-wins. This is a design principle, not a SCION-specific trick: any comparison-based selector conditioned
-on an objective must route that objective into its per-alternative terms. It holds in both settings this
-thesis studies, and \cref{prop:p2cancel} makes it sharper in the second --- under a softmax allocation
-the cancellation is exact on the entire action, not merely on which alternative wins.
+\paragraph{Intent conditioning turns a family of policies into one --- but only if it reaches the
+comparison.} The right way to serve many objectives is not many models but one model that takes the
+objective as input, provided the objective reaches the part of the network that actually decides.
+\Cref{prop:p1cancel} is the crisp version: a conditioning signal entering identically across the
+alternatives cancels under the comparison that picks the action, so a policy can look conditioned while
+behaving identically, and \cref{prop:p2cancel} sharpens it under a softmax allocation, where the
+cancellation is exact on the entire action rather than only on which alternative wins. This is a design
+principle and not a SCION-specific trick: any comparison-based selector conditioned on an objective must
+route that objective into its per-alternative terms.
 
 \paragraph{But the guarantee is narrower than the behavior.} The multipath system supplies the
-qualification, and it is the more useful half of the result. \Cref{prop:p2cancel}'s premise is that the
-conditioning be additive \emph{on the terms the comparison consumes}, and three independent mechanisms
-in a perfectly ordinary architecture break it: a saturating nonlinearity between the conditioning and
-the comparison, a shared encoder that mixes the conditioning into each alternative's hidden
-representation, and an observation normalizer that is itself a function of the objective. Measured on
-trained policies, a globally conditioned agent that theory predicts should be inert is instead a working
-one, indistinguishable in behavioral divergence from the per-alternative variant
-(\cref{sec:p2eval:conditioning}). The reconciliation is that the theory says where conditioning must
-enter to be \emph{guaranteed} to act, while a deep encoder learns to get there without a guarantee. Both
-statements are needed. A designer who has only the first over-engineers; one who has only the second is
-relying on an accident of the function class, and \cref{ch:single_path}'s value-stream agent --- which
-did re-rank three times less --- is what that accident looks like when it does not happen.
+qualification, and it is the more useful half. \Cref{prop:p2cancel}'s premise is additivity \emph{on the
+terms the comparison consumes}, and three mechanisms in a perfectly ordinary architecture break it: a
+saturating nonlinearity between the conditioning and the comparison, a shared encoder that mixes the
+conditioning into each alternative's hidden representation, and an observation normalizer that is itself
+a function of the objective. Measured on trained policies, a globally conditioned agent that theory
+predicts should be inert is instead a working one (\cref{sec:p2eval:conditioning}). The theory therefore
+says where conditioning must enter to be \emph{guaranteed} to act, while a deep encoder learns to get
+there without a guarantee, and both statements are needed: a designer who has only the first
+over-engineers, and one who has only the second is relying on an accident of the function class ---
+\cref{ch:single_path}'s value-stream agent, which re-ranked three times less, is what that accident
+looks like when it does not happen.
 
-The third of those three mechanisms turned out to carry a measurable cost, which is the one place in
-this thesis where a premise violation is not merely a caveat on a proof. An observation normalizer that
-is itself a function of the objective sends the objective into each alternative's features by a second,
-unintended route, and under per-path conditioning the policy then has to reconcile two correlated
-channels where the design specifies one. Closing that route recovers $+0.036$ and $+0.033$ QoE at the
-two intents that had a deficit, changes nothing at the one that did not, and tightens the training-seed
-spread (\cref{sec:p2eval:conditioning}). The design lesson is narrow and portable: when conditioning is
-routed into per-alternative terms, audit the \emph{preprocessing} for the same signal, because a
-normalizer derived from the objective is a conditioning path that nobody declared.
+The third mechanism is the one place in this thesis where a premise violation is not merely a caveat on
+a proof. A normalizer derived from the objective sends the objective into each alternative's features by
+a second, undeclared route, so the policy must reconcile two correlated channels where the design
+specifies one; closing it recovers $+0.036$ and $+0.033$ QoE at exactly the two intents that carried a
+deficit and tightens the training-seed spread (\cref{sec:p2eval:conditioning}). The portable lesson:
+when conditioning is routed into per-alternative terms, audit the \emph{preprocessing} for the same
+signal.
 
-\paragraph{The two decisions are not separable.} The first lesson of \cref{ch:multipath} is the one the
-design was built to test: removing either agent forfeits most of the achievable QoE. An application
-agent over a naive split recovers as little as 35\% of the joint system, and a learned split under a
-conventional bitrate controller as little as 84\% (\cref{sec:p2eval:ablation}). Those recovery ratios
-hold only inside the regime where the system works: on a harsher held-out network both terms go negative
-and the ratio stops meaning anything, which is why \cref{sec:p2eval:regimes} reports the absolute
-difference instead. Rate and split are
-coupled through the same bottleneck, and a controller that fixes either one is optimizing against a
-constraint it could have moved. The decomposition is a claim about the analytical backend: on the
-packet-level one the application-only ablation recovers 80\% rather than 35\%, and the network-only
-ablation costs nothing measurable at all. What the packet-level evidence supports is that the learned
-\emph{scheduler} is worth having; that the learned bitrate controller on top of it is worth having
-remains a mock-backend result.
+\paragraph{The two decisions are not separable.} Removing either agent forfeits most of the achievable
+QoE: an application agent over a naive split recovers as little as 35\% of the joint system, and a
+learned split under a conventional bitrate controller as little as 84\%
+(\cref{sec:p2eval:ablation}). Rate and split are coupled through the same bottleneck, and a controller
+that fixes either is optimizing against a constraint it could have moved. Two qualifications travel with
+this. The recovery ratios hold only inside the regime where the system works, since on a harsher network
+both terms go negative and the ratio stops meaning anything. And the decomposition is a claim about the
+analytical backend: on the packet-level one the application-only ablation recovers 80\% rather than
+35\% and the network-only ablation costs nothing measurable, so what the packet-level evidence supports
+is that the learned \emph{scheduler} is worth having, not the learned bitrate controller on top of it.
 
-\paragraph{What governs the payoff is headroom, not motion.} The second lesson is a correction to the
-intuition we began with. It is tempting to say that learned multipath scheduling matters when the
-network is volatile, and the correction matters because that framing would misdirect anyone deciding
-whether to deploy it. The governing quantity is the relationship between the load an even split places
-on each path and that path's residual capacity (\cref{sec:p2eval:regimes}). Churn, regime shifts, and
-bursts matter because they destroy that evenness transiently --- but they are not the variable. A
-stationary but \emph{asymmetric} topology defeats application-only adaptation as thoroughly as a
-churning one, while a stationary topology of near-equal paths leaves the scheduler almost nothing to
-earn. A third way of destroying the same evenness makes the point without touching the dynamics at all:
-dividing a \emph{fixed} aggregate capacity among more paths raises the scheduler's contribution
-monotonically, from nothing at two paths, where an even split is already near-optimal, to the point at
-twelve where disabling it drives QoE negative (\cref{sec:p2eval:pathcount}).
+\paragraph{What governs the payoff is headroom, not motion.} It is tempting to say that learned
+multipath scheduling matters when the network is volatile, and the correction matters because that
+framing would misdirect anyone deciding whether to deploy it. The governing quantity is the relationship
+between the load an even split places on each path and that path's residual capacity
+(\cref{sec:p2eval:regimes}). Churn, regime shifts, and bursts matter because they destroy that evenness
+transiently, but they are not the variable: a stationary but \emph{asymmetric} topology defeats
+application-only adaptation as thoroughly as a churning one, while near-equal paths leave the scheduler
+almost nothing to earn. A third route to the same conclusion touches the dynamics not at all --- dividing
+a \emph{fixed} capacity among more paths raises the scheduler's contribution monotonically, from nothing
+at two paths to the point at twelve where disabling it drives QoE negative
+(\cref{sec:p2eval:pathcount}).
 
-Three practical implications follow. One should not benchmark a multipath scheduler on a
-well-balanced topology, stationary or not, because that is the regime in which any allocation works ---
-and, as \cref{sec:p2eval:regimes} shows, the regime in which the measured margin can fall below the
-spread between training runs of the same method, so the benchmark reports its own seed draw. The
-payoff scales with the application's intent as well as with the network: the stricter the delay budget,
-the less slack there is to absorb a poor allocation, so the more the allocation matters. And the two
-axes are \emph{not} separable, which the two-dimensional map of \cref{sec:p2eval:regimes} is what
-establishes: the three intents differ by 0.039 QoE on a benign network and by 0.566 on a harsh one, a
-factor of 14.5, so reading the two marginals additively understates the interaction badly. A
-practitioner who measures the intent axis on a well-behaved network will conclude that intent hardly
-matters, and will be measuring the network rather than the intent.
+Two practical implications follow. A multipath scheduler should not be benchmarked on a well-balanced
+topology, stationary or not: that is the regime in which any allocation works, and in which the measured
+margin can fall below the spread between training runs, so the benchmark reports its own seed draw. And
+the network axis and the intent axis are \emph{not} separable --- the three intents differ by 0.039 QoE
+on a benign network and 0.566 on a harsh one --- so a practitioner who measures the intent axis on a
+well-behaved network will conclude that intent hardly matters, and will be measuring the network rather
+than the intent.
 
-\paragraph{A surrogate can be good enough to train in and useless to choose in.} The last lesson is
-methodological and was not one we set out to learn. Six policies trained identically on the analytical
-backend are indistinguishable there --- a spread of 0.008, smaller than a single arm's evaluation-seed
-interval --- and separate into two clean clusters on the packet-level backend, three retaining their
-first-place ranking and three not. The rank correlation between the two backends is $-0.086$: absent, not
-weak, with the best surrogate checkpoint the worst on the realistic body
-(\cref{sec:p2eval:ns3}). The mechanism is identifiable and mundane. The variable that decides the
-packet-level outcome is delay-weighted allocation --- where the bytes go, priced by what each path costs
-at that moment --- and the surrogate's analytical queue compresses it into a \SI{1.9}{\milli\second} band
-where the realistic body spans \SI{9.7}{\milli\second}. A model can therefore be faithful enough to learn
-a good policy in and blind to the dimension that separates good policies from bad ones. The practical
-rule is narrow and firm: select checkpoints on the backend the claim is about, or report the
-distribution over training seeds and select nothing.
+\paragraph{A surrogate can be good enough to train in and useless to choose in.} Six policies trained
+identically on the analytical backend are indistinguishable there, at a spread of 0.008, and separate
+into two clean clusters on the packet-level backend, with a rank correlation of $-0.086$ between the two
+and the best surrogate checkpoint the worst on the realistic body (\cref{sec:p2eval:ns3}). The mechanism
+is mundane: the variable deciding the packet-level outcome is delay-weighted allocation, and the
+surrogate's analytical queue compresses it into a \SI{1.9}{\milli\second} band where the realistic body
+spans \SI{9.7}{\milli\second}. A model can be faithful enough to learn a good policy in and blind to the
+dimension that separates good policies from bad ones. The rule is narrow and firm: select checkpoints on
+the backend the claim is about, or report the distribution over training seeds and select nothing.
 
-\paragraph{Conditioning pays operationally only when the intent moves.} A result we did not anticipate
-bounds what the conditioning argument is worth in deployment. With the objective fixed for the duration
-of a flow -- the regime every headline number in this thesis is measured in -- one conditioned policy
-and a family of specialists are operationally interchangeable, because a deployment can simply load the
-right specialist when the flow starts. The advantage is real only when the objective changes
-\emph{while the connection is up}, and there it is one-sided: relaxing a deadline mid-call costs a
-policy that cannot see the change nothing measurable, while tightening one drives a specialist six
-times past its new budget for ten seconds where the conditioned policy never crosses it
-(\cref{sec:p2eval:conditioning}). The practical statement is therefore narrower and more useful than
-``one model instead of many'': the reason to condition is that objectives move, and the cost of not
-conditioning is paid entirely in the direction that tightens the constraint.
+\paragraph{Conditioning pays operationally only when the intent moves.} With the objective fixed for the
+duration of a flow --- the regime every headline number in this thesis is measured in --- one
+conditioned policy and a family of specialists are operationally interchangeable, since a deployment can
+load the right specialist when the flow starts. The advantage is real when the objective changes
+\emph{while the connection is up}, and there it is one-sided: relaxing a deadline mid-call costs a policy
+that cannot see the change nothing measurable, while tightening one drives a specialist six times past
+its new budget for ten seconds where the conditioned policy never crosses it
+(\cref{sec:p2eval:switch}). The reason to condition is therefore that objectives move, and the cost of
+not conditioning is paid entirely in the direction that tightens the constraint.
 
-\paragraph{One principle, two layers.} Both systems instantiate the Mortise principle~\cite{Shen2026} --
-intent as a first-class input that reshapes a network mechanism -- at successively deeper points of
-control. The single-path selector reshapes \emph{which path} is chosen; the multipath system reshapes both
-\emph{how the paths are used} and \emph{what the application produces}. In both, one conditioned policy
-replaces a family of per-objective ones. The progression suggests a general recipe: expose the
-application's intent, and let it steer every controllable decision between the application and the wire.
+\paragraph{One principle, two layers.} Both systems instantiate the Mortise principle~\cite{Shen2026} ---
+intent as a first-class input that reshapes a network mechanism --- at successively deeper points of
+control: the single-path selector reshapes \emph{which path} is chosen, and the multipath system
+reshapes both \emph{how the paths are used} and \emph{what the application produces}. The progression
+suggests a general recipe: expose the application's intent, and let it steer every controllable decision
+between the application and the wire.
 
 \subsection{Implications}
 \label{sec:disc:implications}
@@ -148,7 +129,11 @@ trained policies and not for the other three, with absolute QoE not portable in 
 (\cref{sec:p2eval:ns3}). Every reported policy is trained on the mock; two packet-level-native training
 seeds do learn, but two is below the three-seed floor the chapter applies elsewhere, so whether the
 system \emph{learns} on the realistic body is supported rather than established
-(\cref{sec:p2impl:gaps}). Since mock score does not predict packet-level rank, the mock's standing as a
+(\cref{sec:p2impl:gaps}).
+\gap{NS-3-native landing point 3 of 3. If the third seed lands and the arm is graded, this sentence
+stops being a limitation and moves out of this list --- into \cref{sec:disc:interpretation} beside the
+surrogate-selection finding, since ``the surrogate is an adequate training environment'' would then be
+measured rather than assumed. Sibling landing points: \cref{sec:p2impl:gaps} and \cref{sec:p2eval:ns3}.} Since mock score does not predict packet-level rank, the mock's standing as a
 training surrogate is an open question rather than a technicality. The headline multipath result is also
 bounded to the distribution it was measured on: it survives on a milder held-out network and fails on a
 harsher one, where a hand-written GCC scheduler beats it in every column
@@ -158,9 +143,20 @@ training seeds per arm the design resolves nothing below \SIrange{0.063}{0.087}{
 margin at issue is 0.048 or less, so the experiment could not have separated the two outcomes either
 way (\cref{sec:p2eval:conditioning}). The specialists it matches were themselves not measurably
 specialized, for the same reason (\cref{sec:p2eval:transfer}).
-The single-path study rests on one topology and one training seed, with a purely temporal train/test
-split, so its quantitative margins should be read as indicative rather than as established effect sizes
-(\cref{sec:p1eval:setup,sec:p1eval:ablation}). Intent in this thesis is \emph{declared}, not
+The multipath study also does not run on a SCION data plane. It assumes the path multiplicity a
+path-aware architecture provides and nothing else: the six paths are a hand-specified configuration
+(\cref{tab:app:p2topo}), with no beaconing, no path store, and no segment composition, so path
+``churn'' there is a hazard process rather than a control-plane event. That makes the results portable
+to any multipath substrate and leaves the union of the two systems --- a learned selector feeding a
+learned scheduler --- untested.
+The single-path study rests on one topology, with a purely temporal train/test split, and its seed
+coverage is uneven in a way worth stating precisely: the conditioning ablation is measured over five
+training seeds with disjoint confidence intervals (\cref{tab:p1eval:seeds}), and so are the
+intent-alignment matrix, the zero-shot sweep, the path-count study, the probing comparison, and the
+congestion ceiling; the two generalization checks on structurally held-out pairs are single-run and
+marked as such (\cref{sec:p1eval:setup}). Since \cref{sec:p2eval:seeds} makes single-run reporting this
+thesis's own cautionary tale, the distinction matters: the single-run margins should be read as
+indicative, and the seeded ones as the learner's. Intent in this thesis is \emph{declared}, not
 \emph{inferred}: we assume the application can state its objective, and we do not study how to recover a
 latent intent from traffic -- a natural but separate problem. The transport model is TCP-like rather than true Multipath QUIC, and the VMAF surrogate is
 bitrate-dominated, so absolute QoE figures should be read as relative comparisons rather than calibrated
@@ -169,20 +165,6 @@ deployment would require. None of these undercut the two qualitative findings --
 the per-alternative comparison is the only kind guaranteed to act, and joint rate-and-split control pays
 off in proportion to how unevenly path capacity is distributed and how strictly the application prices
 delay -- but they do delimit how far the quantitative results should be pushed.
-
-\gap{two limitations are missing from a list that is otherwise exemplary, and both are ones a reader
-will find on their own if this section does not state them. (i) \emph{\Cref{ch:multipath} does not run
-on SCION.} There is no control plane, no beaconing, no path store; the six paths are a hand-specified
-configuration (\cref{tab:app:p2topo}) and the study assumes only path multiplicity. Given the thesis
-title, this belongs in the limitations list explicitly rather than being inferable from
-\cref{sec:mp:impl}. (ii) \emph{\Cref{ch:single_path}'s seed coverage is partial.} The paragraph above
-says ``one topology and one training seed'', which understates the situation in one direction and
-overstates it in another: the ablation ladder \emph{is} at five seeds with disjoint intervals
-(\cref{tab:p1eval:seeds}), while the intent matrix, zero-shot sweep, path-count study, probing
-comparison and ceiling figure are all single-run. Say which is which. The asymmetry matters because
-\cref{sec:p2eval:seeds} makes single-run reporting the thesis's own cautionary tale, and a limitations
-section that blurs the distinction invites the reader to discount the results that \emph{are} properly
-seeded along with those that are not.}
 
 \section{System Analysis}
 \label{sec:analysis}
@@ -256,10 +238,9 @@ ranks first in zero of nine cells there, though it is untroubled above the train
 (\cref{sec:p2eval:pathcount}). And the remaining scalability question is training coverage --- the
 environment must expose enough variety of path counts, topologies, and conditions for the shared scorer
 to generalize --- which the path-count sweep does not answer, because it measures \emph{transfer} from a
-six-path checkpoint rather than what the head would achieve if trained at each count.
-\gap{report how selection quality holds as topology size grows, ideally on topologies larger than
-those seen in training. The path-count axis is now measured in both systems; the topology-size axis is
-not, in either.}
+six-path checkpoint rather than what the head would achieve if trained at each count. How selection
+quality holds as the \emph{topology} grows --- as opposed to the candidate set --- is measured in
+neither system, and is the one scalability question this thesis leaves open.
 
 \subsection{Generalization}
 \label{sec:analysis:generalization}
@@ -313,10 +294,10 @@ this run -- that randomization trades nominal performance for robustness -- is n
 both axes here. One of the two held-out environments is uninformative rather than contrary, both arms
 scoring negative under rankings that do not hold.
 
-\gap{what remains unquantified on this axis is scale, for both systems: the single-path results are one
-topology of 90~ASes and the multipath results one six-path configuration, so nothing here bounds decay
-as topology size grows. This is the more expensive of the two remaining generalization questions and the
-only one still open.}
+What remains unquantified on this axis is scale, in both systems: the single-path results are one
+topology of 90~ASes and the multipath results one six-path configuration, so nothing here bounds how
+performance decays as topology size grows. That is the more expensive of the two remaining
+generalization questions, and the only one still open.
 
 \section{Deployment Considerations and Trust Assumptions}
 \label{sec:analysis:deployability}

@@ -8,8 +8,8 @@ path-aware Internet architecture and the path-selection opportunities it creates
 bitrate control, and multipath transport mechanisms. \Cref{sec:background:rl} recalls 
 the core reinforcement learning (RL) machinery: Markov decision processes, deep $Q$-networks 
 with standard refinements, soft actor-critic, and permutation-equivariant scoring architectures 
-for dynamic action spaces. Finally, \Cref{sec:background:intent} details goal-conditioned 
-policy representations and the goal-conditioning machinery that lets one policy serve many objectives.
+for dynamic action spaces. Finally, \Cref{sec:background:intent} details goal-conditioned and
+multi-objective policy representations, the machinery that lets one policy serve many objectives.
 
 \section{The SCION Path-Aware Architecture}
 \label{sec:background:scion}
@@ -33,24 +33,42 @@ Second, \textbf{path transparency and trust}: because the full AS-level path is 
 an agent can reason about properties beyond raw performance -- for instance a \emph{trust} score that
 reflects how much confidence to place in a path's advertised or measured quality. We exploit this
 in our single-path selection studies, where the reward balances measured goodput against a trust term.
-\gap{the ``trust'' term used in \cref{ch:single_path} is defined purely as
-$1-(w_3\,\mathrm{loss}+w_4\,\mathrm{delay})$ (\cref{eq:p1trust}) -- a reliability score derived from
-measured loss and delay, with no AS reputation, certificate, or path-authentication content. Either
-rename it (``reliability'', ``path quality'') throughout the thesis, or state explicitly here and at
-\cref{eq:p1trust} that it is a performance proxy and not trust in the SCION control-plane sense. A
-reader from this group will otherwise read the stronger meaning into it.}
+
+One point of terminology needs fixing before it can mislead. The \emph{trust} term of
+\cref{ch:single_path} is a \textbf{performance proxy}, computed from a path's measured loss and delay
+alone (\cref{eq:p1trust}). It carries no AS reputation, no certificate, and no path-authentication
+content, and it is not trust in the SCION control-plane sense. We keep the name because it is the one
+the reward of Bourak~et~al.~\cite{Bourak2025} uses and the one our reward inherits, and we repeat the
+qualification where the term is defined.
+
 The flip side of endpoint path choice is a coordination problem: whereas a router runs one routing
 process, every SCION host must decide for itself, ideally without flooding the network with probes.
 Minimizing that probing overhead is an explicit objective throughout our work.
 
-\gap{this chapter is missing three pieces of background that \cref{ch:single_path} uses without
-introducing. (i) \emph{Topology generation}: the study's environment is built with BRITE and a
-Barab\'{a}si--Albert AS graph model, which is never explained. (ii) \emph{The heuristics used as
-baselines}: equal-cost multi-path (ECMP) and what a ``default'' SCION path policy is (shortest
-AS-path, tie-broken by latency) both need a sentence here, since \cref{sec:p1impl:baselines} compares
-against them. (iii) \emph{Prior SCION path selection}: how endpoints choose paths today -- the path
-policy language, the path service, and existing selection heuristics -- so that the learned selector has
-a stated status quo to improve on.}
+\subsection{How SCION endpoints select paths today}
+\label{sec:background:pathsel}
+A SCION host does not receive one path; it receives a set, and something must reduce that set to the
+one path a packet carries. In deployed SCION, that reduction is made by \emph{policy} rather than by
+measurement. The path service delivers the segments known for a destination, the host composes them
+into end-to-end paths, and a path policy -- a declarative filter over hop sequences, ISDs, ASes, and
+path length -- selects among the survivors, with ties broken by a static preference such as the fewest
+AS hops~\cite{Perrig2017}. Path-aware transport APIs expose the same choice to the application, so that
+a socket may pin, rank, or re-select paths. What these mechanisms share is that they rank paths on
+\emph{static} properties: neither hop count nor an ISD filter says anything about which candidate is
+congested at this hour. That is the status quo \cref{ch:single_path} improves on, and the
+\emph{SCION default} baseline of \cref{sec:p1impl:baselines} -- minimum hop count, ties broken by
+measured latency -- is our stand-in for it. It is a generous one, and deliberately so: a deployed
+default breaks its ties on a static preference, whereas ours is charged a latency probe on every
+candidate and breaks them on a measurement.
+
+Two further conventions from that comparison belong here. \emph{Equal-cost multi-path}
+(ECMP)~\cite{RFC2992} spreads flows over the equal-cost members of a route by hashing a packet's
+five-tuple, which keeps a flow's packets on one member while distributing flows across members; it is
+the load-spreading rule the Internet already runs, and \cref{sec:p1impl:baselines} states exactly how
+our single-flow evaluation restricts it. And the AS-level topologies the study runs on are generated
+with BRITE~\cite{Medina2001} under a Barab\'{a}si--Albert preferential-attachment
+model~\cite{Barabasi1999}, which reproduces the heavy-tailed degree distribution of the inter-domain
+graph, and then converted into SCION roles and links (\cref{sec:p1design:env}).
 
 \section{Quality of Experience and Transport Mechanisms}
 \label{sec:background:qoe}
@@ -63,17 +81,29 @@ interactivity adds extreme sensitivity to end-to-end latency, jitter, and frame 
 call is effectively a lost frame. Our multipath reward composes a VMAF-based quality term with penalties for 
 latency, jitter, and loss, making the QoE objective explicit and tunable.
 
-\gap{two pieces of background this section owes \cref{ch:multipath} and does not supply. (i)
-\emph{Google Congestion Control and the WebRTC stack}: GCC is the bitrate estimator behind both the
-\texttt{webrtc} baseline --- the strongest hand-written policy in \cref{tab:p2results} and the one every
-headline margin is quoted against --- and the \texttt{path-only} ablation, yet the reader first meets it
-in an evaluation table with no introduction. A paragraph on how GCC estimates available bandwidth from
-delay gradients and loss is what lets a reader judge whether beating it by 11--21\% is impressive.
-(ii) \emph{The ITU-T ladder}: \cref{tab:p2profiles} keys its three intents to G.1010 use-case classes,
-anchors its delay weights on G.114, its jitter normalizer on Y.1541 class-0 IPDV, and fits $(b,d)$
-against a G.1070 opinion model. Four standards carry the reward's provenance and none is introduced
-here. This background is also what makes the reward-calibration gap at \cref{tab:p2profiles} land as a
-methodological contribution rather than a hyperparameter note.}
+\paragraph{The ITU-T quality ladder.} The weights in such a reward are the part a reader is entitled to
+question, so we anchor ours on published objectives rather than on taste. Four recommendations carry
+that provenance and recur throughout \cref{ch:multipath}. G.1010~\cite{ITUG1010} classifies end-user
+multimedia by delay tolerance, separating conversational video from one-way video and from
+background streaming, which is the axis along which our three application intents are defined.
+G.114~\cite{ITUG114} fixes the delay anchors those classes inherit -- one-way delay up to
+\SI{150}{\milli\second} is preferred and beyond \SI{400}{\milli\second} is unacceptable for
+interactive use. Y.1541~\cite{ITUY1541} supplies the corresponding IP delay-variation objective for its
+most stringent class, which is what our jitter normalizer is scaled to. And G.1070~\cite{ITUG1070} is
+an opinion model that maps coding bitrate, frame rate, packet loss, and delay to an estimated mean
+opinion score for video telephony; because it is an explicit function rather than a table, it can be
+used as a reference against which a simpler linear reward is \emph{fit}, which is how the weights of
+\cref{tab:p2profiles} are obtained.
+
+\paragraph{Google Congestion Control and the WebRTC stack.} The bitrate half of a deployed real-time
+video stack is, in practice, Google Congestion Control (GCC)~\cite{Carlucci2016}, the rate controller
+shipped with WebRTC. GCC estimates the available rate from two signals at once: a receiver-side
+delay-gradient filter that tracks the one-way delay trend across successive frame groups and reduces the
+rate as soon as queues start to build, and a sender-side loss-based controller that reacts to reported
+packet loss. The delay-based branch is what makes it a strong opponent for a learned controller in a
+real-time setting: it backs off before loss occurs rather than after, which is exactly the behavior a
+frame deadline rewards. GCC drives the \texttt{webrtc} comparison point in \cref{ch:multipath} and the
+\texttt{path-only} ablation, and is the reference against which the learned rate controller is measured.
 
 \subsection{Adaptive bitrate and learned control}
 The application-side lever in joint control is adaptive bitrate (ABR) control: choosing the video encoder's
@@ -153,20 +183,32 @@ achieved \emph{a posteriori}. In this thesis, the ``goal'' represents applicatio
 encoded as a vector of reward weights: the agent is explicitly told how much it should prioritize throughput
 versus latency, jitter, loss, or trust, and is expected to adapt its decisions dynamically.
 
-\gap{this subsection reaches for UVFAs and hindsight relabeling and misses the literature that is
-actually about what this thesis does. Conditioning a policy on a vector of \emph{reward weights} and
-expecting it to span the induced family of optima is \textbf{multi-objective reinforcement learning},
-not general goal-conditioning: the goal here is a preference over a scalarization, not a target state,
-and HER --- which relabels with achieved goals --- does not even apply to it. The MORL literature on
-weight-conditioned value functions covers exactly this construction and is not cited once, here or in
-\cref{sec:rel:gcrl}. This is the most conspicuous citation hole in the thesis and the first thing a
-reviewer from the learning side will find. Add a paragraph placing the thesis's intent vector as a
-preference weighting over a linear scalarization, note what MORL already establishes (one network can
-represent the whole Pareto front over a weight simplex), and be explicit about the delta this thesis
-claims on top of it, which is real and narrow: MORL policies are not comparison-based, so nothing in
-that literature addresses \emph{where} in a scoring architecture the weights must enter ---
-which is the entire content of \cref{prop:p1cancel}. Stating that boundary strengthens the
-contribution; omitting the literature makes it look unaware of it.}
+\subsection{Preference weights as goals: multi-objective RL}
+\label{sec:background:morl}
+The goal vector used in this thesis is of a particular kind, and naming it correctly places the work in
+the right literature. Our intent is not a target state to be reached but a \emph{preference weighting}
+over a linear scalarization of several competing reward terms -- goodput against delay in
+\cref{ch:single_path}, quality against delay, jitter, and loss in \cref{ch:multipath}. That is the
+object of study of \textbf{multi-objective reinforcement learning} (MORL), surveyed by
+Roijers~et~al.~\cite{Roijers2013}. Two of its results matter here. First, sweeping the weight simplex
+of a linear scalarization traces the convex coverage set of the underlying multi-objective problem, so
+``one policy for every intent'' is a statement about representing a family of optima rather than about
+storing a list of behaviors. Second, a single network conditioned on the weight vector can represent
+that family and generalize to weightings it was not trained on: Yang~et~al.~\cite{Yang2019} learn an
+envelope value function over states and weights, and Abels~et~al.~\cite{Abels2019} show a
+weight-conditioned network tracking preferences that change during execution -- which is the property
+\cref{sec:p1eval:zeroshot} tests for the single-path selector and \cref{sec:p2eval:conditioning} for
+the multipath one.
+
+What that literature does not address is \emph{where} in the network the weights must enter, because
+its policies emit actions from a fixed, enumerated action space, where any conditioning that reaches
+the output layer at all can change the action. Ours are comparison-based, and the difference is
+decisive: as \cref{sec:p1design:concat} shows, a conditioning signal can reach a comparison-based
+policy, be trained on, and still leave every action unchanged. Hindsight relabeling~\cite{Andrychowicz2017}
+is likewise inapplicable to preference goals, since there is no achieved weight vector to relabel with.
+The delta this thesis claims on top of MORL is therefore narrow and specific: not that one network can
+span a family of objectives, which is established, but where the objective must be injected in a
+\emph{scoring} architecture for it to have any effect on the chosen action.
 
 \subsection{Where the conditioning signal enters}
 \emph{Where} the goal vector enters the network is as consequential as whether it is supplied at all, and
