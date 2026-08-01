@@ -471,7 +471,7 @@ data-generation project). When the learned surrogate is active, the explicit los
 \subsection{Known Gaps}
 \label{sec:p2impl:gaps}
 
-The current testbed has four limitations that scope the results of \cref{sec:mp:eval} and define concrete
+The current testbed has five limitations that scope the results of \cref{sec:mp:eval} and define concrete
 follow-up work.
 
 \begin{itemize}
@@ -483,18 +483,13 @@ follow-up work.
   currently under-sampled, so the quality term is effectively bitrate-dominated; a richer surrogate would
   activate those axes and let quality respond to delivery conditions directly. Every result in
   \cref{sec:mp:eval} therefore uses the bitrate-only logarithmic curve.
-  \item \textbf{Training body.} All reported policies are trained on the mock backend and evaluated on
-  both, because an NS-3-native training seed costs ${\approx}$\,25\,h against the mock's
-  ${\approx}$\,1.5\,h and NS-3 runs cannot be parallelized (\cref{sec:p2eval:ns3}). Whether a
-  mock-trained policy transfers is measured, and the answer is that it depends on the training seed in a
-  way mock evaluation cannot predict; that the system \emph{learns} on the packet-level body is
-  supported by two completed NS-3-native seeds but not established, since two is below the three-seed
-  floor this chapter applies elsewhere.
-  \gap{NS-3-native landing point 1 of 3. When the third seed completes, this item narrows: the training
-  body remains a limitation only in that all \emph{reported} policies are mock-trained, and the clause
-  ``supported \dots\ but not established'' is replaced by whatever the three-seed arm shows. Sibling
-  landing points are \cref{sec:p2eval:ns3} and \cref{sec:disc:limitations}; the future-work sentence in
-  \cref{ch:conclusion} then loses its ``a third is what would'' framing.}
+  \item \textbf{Training body.} Every policy in this chapter except the arm of
+  \cref{sec:p2eval:ns3native} is trained on the mock backend and evaluated on both, because an
+  NS-3-native training seed costs ${\approx}$\,23\,h against the mock's ${\approx}$\,1.5\,h and NS-3 runs
+  cannot be parallelized. That the system \emph{learns} on the packet-level body is now established at
+  three seeds and not merely supported, but the arm that establishes it is unconditioned, so every
+  conditioning, transfer, and mid-call result here remains mock-trained --- and mock-trained policies
+  transfer in a way mock evaluation cannot predict (\cref{sec:p2eval:ns3}).
   \item \textbf{Episode independence.} Episodes reset in-band to keep the shared-memory bridge alive,
   which leaves congestion state warm across resets, so episodes are not independent draws.
   \item \textbf{Horizon-agnosticism is a design property, not a measured one.} The application agent
@@ -507,7 +502,7 @@ follow-up work.
 \section{Experimental Evaluation: Regimes of Value}
 \label{sec:mp:eval}
 
-This section evaluates the multipath system and answers seven questions in turn.
+This section evaluates the multipath system and answers eight questions in turn.
 \Cref{sec:p2eval:setup} fixes the setup, the nine policies compared, and the statistical protocol.
 \Cref{sec:p2eval:results} asks whether the learned pair beats every baseline, and under which
 application intents, and \cref{sec:p2eval:head} asks what produces that margin --- establishing that
@@ -518,14 +513,17 @@ named for --
 scenario label. \Cref{sec:p2eval:transfer} asks whether the three intents produce genuinely different
 policies or merely relabel the reward, and \cref{sec:p2eval:conditioning} asks the thesis's own
 question of this system: whether one policy conditioned on the intent can replace the three that bake it
-in. \Cref{sec:p2eval:ns3} asks whether any of it survives on a packet-level transport stack, and
-\cref{sec:p2eval:ablation} isolates the remaining design choices, including the ones that did not pay
-off. \Cref{sec:p2eval:seeds} draws
+in. \Cref{sec:p2eval:ns3} asks whether any of it survives \emph{transfer} to a packet-level transport
+stack --- the answer is that it survives for half the training seeds and mock score cannot say which
+half --- and \cref{sec:p2eval:ns3native} asks the question that leaves open, whether the system learns
+on that stack when trained there. \Cref{sec:p2eval:ablation} isolates the remaining design choices,
+including the ones that did not pay off, and \cref{sec:p2eval:seeds} draws
 together what the section's retractions have in common, which is a result in its own right.
 
-Every figure in this section is rendered from evaluation runs against checkpoints already on disk; no
-result below required a training run except the one conditioning arm of \cref{sec:p2eval:conditioning}
-that is identified as such.
+Every figure in this section is rendered from evaluation runs against checkpoints already on disk. Two
+results required new training rather than new evaluation, and both are identified where they appear: the
+one conditioning arm of \cref{sec:p2eval:conditioning}, and the three packet-level-native seeds of
+\cref{sec:p2eval:ns3native}.
 
 \subsection{Setup, Baselines, and Statistical Protocol}
 \label{sec:p2eval:setup}
@@ -1411,7 +1409,8 @@ weight-swapping would achieve, not an upper one: it lived through the pre-switch
 the same queue state, which is why it also spikes, to ${\approx}\SI{530}{\milli\second}$, where a call
 that had started under the tight deadline would not.
 
-\subsection{Does It Survive a Packet-Level Transport Stack?}
+\subsection[Does It Survive Transfer to a Packet-Level Transport Stack?]{Does It Survive
+\emph{Transfer} to a Packet-Level Transport Stack?}
 \label{sec:p2eval:ns3}
 
 Every result so far is measured on the analytical mock. \Cref{tab:p2ns3} evaluates six independently
@@ -1538,37 +1537,116 @@ not establish that forcing a lower delay-weighted allocation would make a non-tr
 transfer. The intervention that would --- retraining with a delay-aware split prior, or raising the
 delay weight $b$ and re-running --- is the natural next experiment and we did not run it.
 
-\paragraph{Training on the packet-level body: partial, and not yet reportable.} Whether the system
-\emph{learns} on the realistic body, as opposed to transferring to it, is a different question from the
-one above, and \cref{tab:p2seeds} makes it the live one rather than a footnote. Two NS-3-native training
-seeds have since been run to completion, and both learn: episode-0 to episode-99 QoE moves from $-0.088$
-to $+0.340$ on the first and from $-0.002$ to $+0.456$ on the second. A third was interrupted at episode
-14, having reached $+0.350$ by episode 13. Two seeds is below the three-seed floor this chapter applies
-to everything else, and no A/B grading has been run against it, so the qualitative answer looks positive
-and the quantitative one is not yet claimed here.
+\subsection{Training on the Packet-Level Body}
+\label{sec:p2eval:ns3native}
 
-\gap{NS-3-native landing point 2 of 3, and the one that carries the result. The third seed is running;
-when it completes, replace this paragraph with the three-seed answer to the chapter's most valuable
-open question --- whether the system \emph{learns} on the packet-level body rather than merely
-transferring to it. Report it the way the chapter reports everything else: per-seed final QoE with
-$\mathit{SD}_{\mathrm{train}}$, an \texttt{ab\_eval} grading against the same comparison set as
-\cref{tab:p2ns3}, and per-cell ranking rather than a mean alone. Two consequences follow if it holds
-and should be stated here: \cref{sec:p2eval:seeds}'s rule --- sample seeds \emph{and} grade them on the
-backend the claim is about --- gains its constructive arm rather than only its cautionary one, and the
-mock's standing becomes a training-cost argument rather than an open question. If it does not hold, that
-is the more interesting result and belongs in \cref{sec:p2eval:summary}'s list of claims that do not
-survive. Sibling landing points: \cref{sec:p2impl:gaps} and \cref{sec:disc:limitations}.}
+Whether the system \emph{learns} on the realistic body, as opposed to transferring to it, is a different
+question from the one above, and \cref{tab:p2seeds} makes it the live one rather than a footnote. It is
+also the question the previous subsection cannot answer, because every policy in it was trained
+somewhere else. Three NS-3-native seeds have since been trained to completion --- 100 episodes each,
+identical hyperparameters, the dynamic scenario --- and graded under the protocol this chapter applies
+everywhere else.
 
-What the exercise did settle is the cost, and the previously quoted figure was wrong by a factor of six.
-The ${\approx}$\,4\,h per 100-episode seed extrapolated from a 5-episode probe (441\,s against the mock's
+All three learn, and they learn the same thing. Mean episode QoE over the first ten episodes against the
+last ten moves from $0.089$ to $0.480$, from $0.060$ to $0.425$, and from $0.021$ to $0.477$. Over that
+same span the offered bitrate \emph{falls}, from ${\approx}\SI{3.0}{\mega\bit\per\second}$ to
+\SIrange{2.2}{2.5}{\mega\bit\per\second}, while loss drops from $0.37$ to $0.07$ and one-way latency from
+\SI{116}{\milli\second} to \SI{65}{\milli\second}. Against a real queue the policy learns to stop overdriving it --- which is
+the delay-weighted-allocation mechanism isolated above, arrived at by training rather than by luck of
+the draw.
+
+\begin{table}[t]
+  \centering
+  \caption[NS-3-native training, graded on the packet-level backend]{NS-3-native training, graded on the packet-level backend: three checkpoints trained on the
+  NS-3 body, evaluated on it over three evaluation seeds, $3 \times 3$ cells, same protocol and
+  comparison set as \cref{tab:p2ns3} with minRTT added. Compare the top two rows against
+  \cref{tab:p2ns3}, where the same two are inverted. Source:
+  \texttt{rl-mpquic/runs/ab-d5-ns3native/ab\_summary.json}.}
+  \label{tab:p2ns3native}
+  \begin{tabular}{lcccccc}
+    \toprule
+    Policy & QoE & $\mathit{SD}_{\mathrm{train}}$ & VMAF & Latency & Loss & Bitrate \\
+    \midrule
+    Learned pair (NS-3-native) & \textbf{0.576} & \textbf{0.019} & 77.6 & \SI{55.7}{\milli\second}  & 0.020 & 2447 \\
+    Path-only (GCC rate)       & 0.462 & 0.004 & 77.7 & \SI{71.0}{\milli\second}  & 0.093 & 2658 \\
+    App-only                   & 0.397 & 0.023 & 74.2 & \SI{78.0}{\milli\second}  & 0.102 & 2166 \\
+    WebRTC                     & 0.308 & 0.000 & 54.3 & \SI{49.3}{\milli\second}  & 0.074 & 1174 \\
+    Proportional               & 0.146 & 0.000 & 46.1 & \SI{62.2}{\milli\second}  & 0.124 & 1276 \\
+    Even split                 & 0.132 & 0.000 & 25.0 & \SI{40.9}{\milli\second}  & 0.003 & 301 \\
+    Random split               & 0.124 & 0.000 & 25.4 & \SI{40.2}{\milli\second}  & 0.003 & 306 \\
+    minRTT                     & 0.111 & 0.000 & 52.1 & \SI{73.6}{\milli\second}  & 0.174 & 1637 \\
+    Single best path           & $-0.131$ & 0.000 & 67.3 & \SI{145.1}{\milli\second} & 0.407 & 2848 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\paragraph{First in every cell, and the split does not reappear.} \Cref{tab:p2ns3native} is the result
+\cref{tab:p2ns3} could not produce. The learned pair leads the whole comparison set by $0.114$ QoE ---
+measured against the path-only ablation, which is the policy that beat it zero-shot and which keeps our
+own learned scheduler under a GCC rate controller --- against a training-seed spread of $0.019$, a
+margin of six times its own resolution. Against WebRTC, the strongest policy here that is genuinely
+hand-written, the margin is $0.267$. It ranks first in nine of nine cells rather than eight of eighteen. The bimodality of \cref{tab:p2seeds} is gone: per-seed means
+are $0.559$, $0.596$, and $0.573$, a spread of $0.019$ against the mock-trained arm's $0.081$, with no
+gap for an ablation to sit in. The mechanism rows say why. Delivered loss is $0.020$ against the
+zero-shot arm's $0.155$ and latency \SI{55.7}{\milli\second} against \SI{86.4}{\milli\second}, at the
+same delivered quality (VMAF 77.6 against 77.0) and a marginally lower offered bitrate (2447 against
+2546\,kbit/s) --- the same video pushed through a real transport at a seventh of the loss.
+
+\paragraph{Against mock-trained transfer, on the same cells.} The direct question --- does training on
+the packet-level body beat transferring to it? --- is a paired comparison over the identical nine cells,
+which cancels the environment noise the two arms share. NS-3-native training wins by $\mathbf{+0.228}$
+QoE ($\pm 0.071$ at 95\%), positive in nine of nine cells, smallest cell margin $+0.106$. The two arms
+differ in reliability by as much as in level: the mock-trained arm's three per-seed means run from
+$0.23$ to $0.46$, a training-seed spread six times the native arm's $0.019$. Where the
+mock-trained learned pair fails to top five of its nine cells --- beaten by the path-only ablation in
+five and by the app-only ablation in two --- the native arm tops all nine. The 3-of-6 split of
+\cref{tab:p2seeds} is therefore a property of the \emph{training body}, not of the method: the same
+learner, the same architecture, and the same reward produce a consistent first-place policy once trained
+where it is measured.
+
+\paragraph{The mock cannot grade this arm either, and it fails in the opposite direction.} Grading the
+three native checkpoints on the mock --- the same nine cells, the analytical backend --- puts the
+learned pair \emph{second}, behind WebRTC ($0.518$ against $0.547$), in nine of nine cells, with the
+path-only ablation ahead of it in two. Over the nine policies the two backends agree at Spearman
+$\rho = 0.467$ (Kendall $\tau = 0.389$, 11 of 36 pairs discordant): WebRTC moves from fourth to first,
+minRTT from eighth to fourth, and \texttt{single} from last to fifth. This is the same failure as
+\cref{tab:p2seeds}'s $\rho = -0.086$ observed from the other side, and it is the more damaging
+direction. The earlier result said the mock cannot pick which mock-trained checkpoint transfers; this
+one says the mock, used as a grader, would have rejected the best system this chapter produced and
+crowned the deployed baseline instead. Both are the queue-fidelity gap: the surrogate does not charge a
+policy for the queueing it causes, so it cannot rank policies that differ mainly in how much queueing
+they cause.
+
+\paragraph{What this settles and what it does not.} Three things change. The chapter's central claim ---
+that joint rate-and-split control beats every hand-written alternative --- survives on the packet-level
+body after all, provided the policy is trained there; what \cref{sec:p2eval:ns3} refuted was zero-shot
+transfer, not the claim. \Cref{sec:p2eval:seeds}'s rule gains its constructive arm: when a surrogate
+cannot grade, the remedy is to move the training body, not to sample more surrogate seeds, and here that
+move also collapsed the seed spread sixfold. And the mock's standing is now measured rather than
+assumed --- it is a cheap training environment that costs $0.228$ QoE and a sixfold spread across seeds,
+which is a real price and not a technicality.
+
+Four limits bound it. Three seeds is this chapter's floor, not a comfortable margin, and the arm is
+graded over three evaluation seeds of five episodes each. The arm is unconditioned: it is the dynamic
+scenario at the nominal intent, so every conditioning, transfer, and mid-call result in this chapter
+remains mock-only, and nothing here says an NS-3-native \emph{conditioned} policy would behave the same.
+The out-of-distribution finding of \cref{sec:p2eval:regimes} is untouched --- these seeds trained and
+were graded on the same distribution. And the comparison is native-trained against mock-trained
+\emph{on NS-3}; the reverse penalty is real and symmetric, since the native checkpoints score $0.518$ on
+the mock where mock-trained ones score $0.617$. Each backend flatters its own.
+
+\paragraph{What it costs.} The earlier estimate of this cost was wrong by a factor of six. The
+${\approx}$\,4\,h per 100-episode seed extrapolated from a 5-episode probe (441\,s against the mock's
 436\,s) does not survive contact with a full run, because per-episode cost grows with replay-buffer
-occupancy. Measured on the two completed seeds, an NS-3-native seed takes \textbf{${\approx}$\,25\,h},
-about \SI{15}{\minute} per episode. Runs are also strictly sequential, because both
+occupancy. Measured end to end on the three seeds, they took 24.6\,h, 25.0\,h, and 20.1\,h --- about
+\SI{14}{\minute} per episode. Runs are also strictly sequential, because both
 \texttt{ns3ai\_utils.Experiment} and \texttt{ns3-ai-msg-interface.h} default the shared-memory segment
-name to \texttt{"My Seg"} and nothing overrides it, so two concurrent runs deadlock. A three-seed NS-3
-arm is therefore ${\approx}$\,75\,h wall-clock against ${\approx}$\,4.5\,h for the mock arm run three-up,
-a factor of roughly 17. That ratio, not a fidelity judgment, is the honest reason every policy reported
-in this chapter is mock-trained.
+name to \texttt{"My Seg"} and nothing overrides it, so two concurrent runs deadlock. The three-seed NS-3
+arm therefore cost \textbf{${\approx}$\,70\,h} wall-clock against ${\approx}$\,4.5\,h for the mock arm
+run three-up, a factor of roughly 15; grading it cost a further \SI{18}{\minute} for the nine NS-3 cells
+and \SI{37}{\minute} for the paired comparison, against \SI{2}{\minute} for the same nine cells on the
+mock. That ratio, not a fidelity judgment, is why every \emph{other} policy in this chapter is
+mock-trained --- and \cref{tab:p2ns3native} is the measurement of what that convenience costs.
 
 \subsection{Ablations}
 \label{sec:p2eval:ablation}
@@ -1583,12 +1661,18 @@ intent --- on the mock. Removing the transport agent (app-only) costs 65\% of th
 10\% and 16\% respectively. Neither half is sufficient, and the difference is what the joint premise of
 \cref{sec:p2design:motivation} buys.
 
-On the packet-level body the decomposition does not hold, and this is the sharpest instance of the
-sim-to-sim gap of \cref{sec:p2eval:ns3}. There the app-only ablation recovers 80\% of the full system
-rather than 35\%, and the path-only ablation does not cost anything at all --- it \emph{outscores} the
-full pair, 0.380 against 0.348, within noise. The two-sided ablation is therefore a claim about the
-analytical backend and must be stated as one: what the packet-level body supports is that the learned
-scheduler is worth having, not that the learned bitrate controller on top of it is.
+Transferred zero-shot to the packet-level body the decomposition does not hold, and this is the sharpest
+instance of the sim-to-sim gap of \cref{sec:p2eval:ns3}. There the app-only ablation recovers 80\% of
+the full system rather than 35\%, and the path-only ablation does not cost anything at all --- it
+\emph{outscores} the full pair, 0.380 against 0.348, within noise.
+
+That inversion, however, is an artifact of transfer rather than of the backend. On the NS-3-native arm
+of \cref{sec:p2eval:ns3native} both halves cost something again, and cost more than they did on the
+mock: removing the transport agent leaves 69\% of the full system and removing the application agent
+leaves 80\%, with the full pair ahead of both by margins of $0.179$ and $0.114$ against a training-seed
+spread of $0.019$. The correct statement is therefore narrower than ``the decomposition is
+mock-specific'' and more useful: the joint premise holds wherever the policy was trained, and a policy
+transferred across backends degrades unevenly, its bitrate controller more than its scheduler.
 
 \paragraph{Domain randomization does not help here, on either axis.} Randomizing the dynamics hazard
 rates per training episode costs 0.027 QoE on the nominal environment and loses in all nine evaluation
@@ -1676,10 +1760,19 @@ packet-level body is $-0.086$, so \emph{no} amount of mock evaluation identifies
 transfers. The lesson upgrades accordingly --- seeds must be sampled \emph{and} graded on the backend
 the claim is about.
 
+Both corollaries have a constructive counterpart, and \cref{sec:p2eval:ns3native} supplies it: what did
+work was changing the backend rather than the sample size. Training on the packet-level body collapsed
+the spread that no amount of mock evaluation could see through, from 0.081 to 0.019, and turned a
+three-of-six split into first place in nine of nine cells. This is the same reading as the normalizer
+intervention above, one layer out: the spread is a property of the learner \emph{and its environment},
+and it moves when one of those changes. So the rule has two arms rather than one. Sample training seeds
+and grade them where the claim lives; and when the surrogate cannot grade, the fix is to move the
+training body, not to buy more surrogate seeds.
+
 \subsection{Summary}
 \label{sec:p2eval:summary}
 
-Six claims survive this evaluation, and four do not.
+Seven claims survive this evaluation, and four do not.
 
 The learned pair beats every one of eight comparison points under all three application intents on the
 analytical backend, with stable rankings and margins of $+0.065$, $+0.118$, and $+0.143$ QoE over the
@@ -1701,6 +1794,10 @@ among, and with the strictness of the application's intent --- the last being th
 shares with \cref{ch:single_path} --- and the first and third of those interact rather than adding. And
 \cref{prop:p2cancel} holds exactly for additively separable scorers, discharging for that function class
 the claim that the cancellation of \cref{ch:single_path} covers softmax as well as argmax selectors.
+The seventh claim is the one this evaluation added last and the one that most changes the reading of the
+rest: trained on the packet-level body rather than transferred to it, the learned pair leads the same
+comparison set by $0.114$ QoE at a training-seed spread of $0.019$ and ranks first in nine of nine
+cells, beating mock-trained transfer on identical cells by $0.228$ with every cell positive.
 
 Four claims do not survive, and one more is bounded rather than refuted: at six training seeds per arm
 this design resolves QoE differences no smaller than \SIrange{0.063}{0.087}{}, which is larger than
@@ -1709,7 +1806,9 @@ rather than demonstrating equivalence. Of the four that fail outright, the first
 produce measurably intent-specific policies: no margin in
 the transfer matrix clears its own training-seed spread. The ranking does not transfer zero-shot to the
 packet-level backend: three of six checkpoints keep first place and three do not, and mock score does
-not predict which. Global-only conditioning is not inert, as \cref{prop:p2cancel} would suggest for
+not predict which --- a failure of transfer rather than of the method, since training on that backend
+restores first place in every cell, but the zero-shot claim as originally made is gone. Global-only
+conditioning is not inert, as \cref{prop:p2cancel} would suggest for
 a system whose scorer met its premise: a trained nonlinear encoder routes the intent past the
 cancellation, so the proposition constrains the architecture for exactly one layer. And the headline
 claim is bounded by the distribution it was trained on rather than general: it holds on the nominal
@@ -1719,7 +1818,8 @@ buy invariance to the capacity behind those paths.
 
 The negatives are the more valuable half. Together they say that the theory identifies where
 conditioning must enter for a \emph{guarantee} while the experiment shows a deep encoder arriving there
-without one; that a cheap surrogate can be an adequate training environment while being useless for
-selecting among the policies it produces; and that a learned scheduler's advantage over hand-written
-rules is a function of the regime it is measured in, in both directions. All three are stronger
-statements than the results they replaced.
+without one; that a cheap surrogate is useless for selecting among the policies it produces, and, once
+the comparison is run, is not a free training environment either but one that costs $0.228$ QoE and a
+sixfold seed spread; and that a learned scheduler's advantage over hand-written rules is a function of
+the regime it is measured in, in both directions. All three are stronger statements than the results
+they replaced.

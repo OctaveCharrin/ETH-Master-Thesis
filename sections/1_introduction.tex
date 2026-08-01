@@ -86,7 +86,9 @@ This thesis makes the following explicit, verifiable contributions:
   eight comparison points under all three application intents, leading a WebRTC-style deployed stack by
   0.065, 0.118, and 0.143 QoE against training-seed spreads of 0.018--0.023, and minRTT --- the default
   scheduler in every deployed Multipath TCP and Multipath QUIC stack --- by 0.139--0.250, at higher VMAF
-  and lower delivered latency in each case (\cref{ch:multipath}).
+  and lower delivered latency in each case. Trained on the packet-level backend rather than transferred
+  to it, the same design leads the comparison set by 0.114 QoE at a training-seed spread of 0.019 and
+  ranks first in nine of nine cells (\cref{ch:multipath}).
 
   \item \textbf{The permutation-equivariant path head is load-bearing, not a convenience.} Scoring each
   candidate with shared weights is usually presented as the way to accommodate a variable action set. We
@@ -124,14 +126,17 @@ This thesis makes the following explicit, verifiable contributions:
   distribution and on a milder held-out network and fails on a harsher one, where a WebRTC-style
   scheduler beats the learned pair in every column (\cref{ch:multipath,sec:analysis}).
 
-  \item \textbf{A measurement discipline for learned network control, arrived at by retraction.} Four
-  results in this thesis were reported from a single training run and did not survive being run three
-  times, because the spread over training seeds exceeds the confidence interval over evaluation seeds by
+  \item \textbf{A measurement discipline for learned network control, arrived at by retraction.} Ten
+  results in this thesis looked clean at one sampling of the training seed and did not survive a larger
+  one --- four of them reported from a single run and retracted at three --- because the spread over
+  training seeds exceeds the confidence interval over evaluation seeds by
   an order of magnitude on this problem. Sampling training seeds is necessary and, we show, not
   sufficient in two distinct ways. Across six independently trained policies the analytical backend's
   ranking is uncorrelated with the packet-level backend's ($\rho = -0.086$, the best surrogate checkpoint
-  being the worst on the packet-level body), so a cheap surrogate can be an adequate training environment
-  while carrying no information for selecting among the policies it produces. And a fifth result survived
+  being the worst on the packet-level body), so a cheap surrogate carries no information for selecting
+  among the policies it produces --- and training on the packet-level body instead, which we then did at
+  three seeds, beats transferring to it by 0.228 QoE on identical cells at a sixth of the seed spread, so
+  it is not a free training environment either. And a fifth result survived
   six seeds on its pooled statistic and failed once that statistic was decomposed per seed, two of six
   runs trending the opposite way behind a pooled Spearman $\rho$ of 0.800 --- so seeds must be sampled,
   graded on the backend the claim is about, and read individually before they are pooled

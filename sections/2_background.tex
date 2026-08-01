@@ -211,9 +211,8 @@ span a family of objectives, which is established, but where the objective must 
 \emph{scoring} architecture for it to have any effect on the chosen action.
 
 \subsection{Where the conditioning signal enters}
-\emph{Where} the goal vector enters the network is as consequential as whether it is supplied at all, and
-the literature on goal-conditioned RL says little about it because its usual policies are not
-comparison-based. Our policies are. When the action is an $\arg\max$ over per-alternative scores, a
+That last point is the one the rest of the thesis turns on, so it is worth stating mechanically. When
+the action is an $\arg\max$ over per-alternative scores, a
 conditioning signal that enters only terms shared by every alternative shifts all scores together and
 cancels under the comparison, so the policy can consume the goal without ever acting on it. The signal
 must instead reach the per-alternative terms, where it can interact with each candidate's own features

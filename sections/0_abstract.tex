@@ -31,8 +31,10 @@ routings carry a guarantee, not which happen to work.
 
 What governs the payoff of joint control is not whether the network is moving but how unevenly capacity
 is spread across paths and how strictly the application prices delay --- and that map bounds our
-headline claim: it holds on a milder held-out network and fails on a harsher one. On a packet-level
-backend only three of six independently trained policies keep their ranking, and surrogate score does
-not predict which, so a cheap surrogate can be a fine training environment and a useless one for
-choosing among the policies it produces. Throughout, the single-path study runs on a generated SCION
-topology; the multipath study assumes only path multiplicity.
+headline claim: it holds on a milder held-out network and fails on a harsher one. Transferred zero-shot
+to a packet-level backend only three of six independently trained policies keep their ranking, and
+surrogate score does not predict which; trained on that backend instead, the pair leads every
+comparison point in nine of nine cells and beats transfer by 0.228 QoE. A cheap surrogate is therefore
+useless for choosing among the policies it produces, and not free to train in either. Throughout, the
+single-path study runs on a generated SCION topology; the multipath study assumes only path
+multiplicity.

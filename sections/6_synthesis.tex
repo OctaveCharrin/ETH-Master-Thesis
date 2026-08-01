@@ -6,7 +6,7 @@ what intent-conditioned single-path selection and joint multipath co-optimizatio
 intent-driven network control. \Cref{sec:analysis} then analyzes both systems along the axes that decide
 whether learned path control is practical -- overhead, scalability, and generalization -- and
 \cref{sec:analysis:deployability} states the deployment gaps and trust assumptions under which the
-controllers operate. Where a claim depends on measurements still in progress, it is marked.
+controllers operate.
 
 \section{Synthesis of Findings}
 \label{sec:discussion}
@@ -54,10 +54,12 @@ learned split under a conventional bitrate controller as little as 84\%
 (\cref{sec:p2eval:ablation}). Rate and split are coupled through the same bottleneck, and a controller
 that fixes either is optimizing against a constraint it could have moved. Two qualifications travel with
 this. The recovery ratios hold only inside the regime where the system works, since on a harsher network
-both terms go negative and the ratio stops meaning anything. And the decomposition is a claim about the
-analytical backend: on the packet-level one the application-only ablation recovers 80\% rather than
-35\% and the network-only ablation costs nothing measurable, so what the packet-level evidence supports
-is that the learned \emph{scheduler} is worth having, not the learned bitrate controller on top of it.
+both terms go negative and the ratio stops meaning anything. And the decomposition follows the training
+body rather than the evaluation body: transferred zero-shot to the packet-level backend it dissolves ---
+the application-only ablation recovers 80\% rather than 35\% and the network-only ablation costs nothing
+measurable --- whereas policies \emph{trained} on that backend restore it, both halves costing 31\% and
+20\% against a training-seed spread of 0.019 (\cref{sec:p2eval:ns3native}). What degrades under transfer
+is the learned bitrate controller more than the learned scheduler.
 
 \paragraph{What governs the payoff is headroom, not motion.} It is tempting to say that learned
 multipath scheduling matters when the network is volatile, and the correction matters because that
@@ -79,7 +81,8 @@ on a benign network and 0.566 on a harsh one --- so a practitioner who measures 
 well-behaved network will conclude that intent hardly matters, and will be measuring the network rather
 than the intent.
 
-\paragraph{A surrogate can be good enough to train in and useless to choose in.} Six policies trained
+\paragraph{A surrogate can be good enough to train in and useless to choose in --- and the price of
+using it is measurable.} Six policies trained
 identically on the analytical backend are indistinguishable there, at a spread of 0.008, and separate
 into two clean clusters on the packet-level backend, with a rank correlation of $-0.086$ between the two
 and the best surrogate checkpoint the worst on the realistic body (\cref{sec:p2eval:ns3}). The mechanism
@@ -87,7 +90,14 @@ is mundane: the variable deciding the packet-level outcome is delay-weighted all
 surrogate's analytical queue compresses it into a \SI{1.9}{\milli\second} band where the realistic body
 spans \SI{9.7}{\milli\second}. A model can be faithful enough to learn a good policy in and blind to the
 dimension that separates good policies from bad ones. The rule is narrow and firm: select checkpoints on
-the backend the claim is about, or report the distribution over training seeds and select nothing.
+the backend the claim is about, or report the distribution over training seeds and select nothing. The
+grading failure is also bidirectional, which is what makes it a property of the surrogate rather than of
+the policies: used as a grader on policies trained on the realistic body, the surrogate ranks the best
+of them second behind a deployed baseline in nine of nine cells
+(\cref{sec:p2eval:ns3native}). And once the same comparison is run in the training direction, the
+surrogate's convenience acquires a price tag: policies trained on the realistic body beat transferred
+ones by $0.228$ QoE on identical cells, at a sixth of the seed spread, for roughly fifteen times the
+wall-clock. That is a defensible trade to make deliberately and an expensive one to make by default.
 
 \paragraph{Conditioning pays operationally only when the intent moves.} With the objective fixed for the
 duration of a flow --- the regime every headline number in this thesis is measured in --- one
@@ -124,17 +134,13 @@ that is awkward or impossible in a destination-based Internet.
 
 The results are bounded in ways that the analysis (\cref{sec:analysis}) details and that fairness requires
 restating here. Both systems are evaluated in simulation. The multipath system's headline numbers are
-measured on the analytical mock, and on the packet-level backend they hold for three of six independently
-trained policies and not for the other three, with absolute QoE not portable in any case
-(\cref{sec:p2eval:ns3}). Every reported policy is trained on the mock; two packet-level-native training
-seeds do learn, but two is below the three-seed floor the chapter applies elsewhere, so whether the
-system \emph{learns} on the realistic body is supported rather than established
-(\cref{sec:p2impl:gaps}).
-\gap{NS-3-native landing point 3 of 3. If the third seed lands and the arm is graded, this sentence
-stops being a limitation and moves out of this list --- into \cref{sec:disc:interpretation} beside the
-surrogate-selection finding, since ``the surrogate is an adequate training environment'' would then be
-measured rather than assumed. Sibling landing points: \cref{sec:p2impl:gaps} and \cref{sec:p2eval:ns3}.} Since mock score does not predict packet-level rank, the mock's standing as a
-training surrogate is an open question rather than a technicality. The headline multipath result is also
+measured on the analytical mock, and \emph{transferred} zero-shot to the packet-level backend they hold
+for three of six independently trained policies and not for the other three, with absolute QoE not
+portable in any case (\cref{sec:p2eval:ns3}). Trained on that backend instead the headline result
+returns --- first in nine of nine cells, $0.228$ QoE ahead of mock-trained transfer on identical cells
+(\cref{sec:p2eval:ns3native}) --- but that arm is unconditioned and covers one scenario, so every
+conditioning, intent-transfer, and mid-call result in the chapter remains mock-trained and inherits the
+transfer caveat. The headline multipath result is also
 bounded to the distribution it was measured on: it survives on a milder held-out network and fails on a
 harsher one, where a hand-written GCC scheduler beats it in every column
 (\cref{sec:p2eval:regimes}). The parity of the intent-conditioned policy with the per-intent specialists is a failure to
@@ -310,7 +316,9 @@ Several gaps still separate these prototypes from a deployment.
   relies on a synthetic traffic and beaconing environment; the multipath system on NS-3 and a mock
   transport. Bridging the gap to deployment would require sim-to-real transfer -- for example through domain
   randomization or online fine-tuning against live measurements -- and the packet-level NS-3 backend is the
-  intended stepping stone (\cref{sec:p2impl:gaps}).
+  intended stepping stone. Training there rather than transferring to it is measured and is worth
+  $0.228$ QoE (\cref{sec:p2eval:ns3native}), which is also the best available estimate of what the next
+  fidelity step would cost to skip.
   \item \textbf{Real transport.} The multipath system models subflows with TCP-like congestion control
   rather than true Multipath QUIC~\cite{DeConinck2017}. A real QUIC integration is therefore needed to
   validate the per-frame scheduling under an actual multipath transport.

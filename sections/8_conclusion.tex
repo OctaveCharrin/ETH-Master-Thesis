@@ -22,7 +22,8 @@ ones had covered.
 a controller that fixes either is optimizing against a constraint it could have moved -- removing
 either agent forfeits most of the achievable quality, and the joint pair leads every comparison point
 under every application intent at margins several times the spread between training runs of the same
-method. Close behind it is an architectural lesson we had expected to be a convenience and found to be
+method --- on the analytical backend under all three intents, and on the packet-level backend too once
+the policy is trained there rather than transferred to it. Close behind it is an architectural lesson we had expected to be a convenience and found to be
 load-bearing. Scoring each candidate with shared weights is normally adopted so that a policy can
 accommodate a variable action set; substituting a conventional fixed-dimension head costs more quality
 than any other single change we measured, and enough that the system's headline claim reverses
@@ -74,19 +75,22 @@ favorable run. That the same failure appears in both systems, at different sever
 property of the method rather than of one experiment. The cause is the same in both:
 on this problem the spread between training runs exceeds the confidence interval over evaluation
 episodes by an order of magnitude. Sampling training seeds is necessary and not sufficient: a cheap
-simulator can be faithful enough to train good policies in while being uncorrelated with the realistic
-body on which of them is good. Nor is it sufficient to sample seeds and then pool over them: a summary
+simulator can be faithful enough to train usable policies in while being uncorrelated with the realistic
+body on which of them is good --- and, once we measured it, expensive in the only currency that matters,
+since training on the realistic body instead beat transferring to it by 0.228 QoE. Nor is it sufficient
+to sample seeds and then pool over them: a summary
 statistic computed across seeds before its sign is checked within them can turn ``four runs agree and
 two disagree'' into one confident-looking number. We report the retractions as a result because the
 pattern is more useful than any of the numbers it corrected, and because it is the one finding here that
 generalizes beyond multipath scheduling.
 
 \paragraph{Future work.} Several threads remain open, and much of the draft's structure is deliberately laid
-out to guide them. On the experimental side, the sharpest question is the one \cref{sec:p2eval:ns3}
-raises: whether the system \emph{learns} on the packet-level body rather than merely transferring to it,
-which matters more now that we know surrogate score does not predict packet-level rank. Two native
-training seeds are complete and both learn; a third is what would put the answer on the same evidential
-footing as the rest of the chapter. Alongside it,
+out to guide them. On the experimental side, the question \cref{sec:p2eval:ns3} raised --- whether the system \emph{learns}
+on the packet-level body rather than merely transferring to it --- is now answered at three seeds and in
+the affirmative (\cref{sec:p2eval:ns3native}), which relocates rather than closes it: that arm is
+unconditioned and covers one scenario, so the natural next run is a packet-level-native
+\emph{conditioned} policy, which would put the chapter's conditioning results on the same footing as its
+headline one. Alongside it,
 testing both systems on topologies larger than those they trained on ---
 the path-count axis of that question is now measured and the topology-size axis is not. On
 the system side: replacing the TCP-like subflows with a real Multipath QUIC transport, and enriching the
