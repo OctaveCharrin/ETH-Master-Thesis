@@ -39,12 +39,38 @@ lower cap at −0.799 fell below the axis and the bar rendered one-sided at abou
 half its true length — the figure understated exactly the quantity the paragraph
 is about. The axis is now bounded by mean ± trainSD.
 
+### `p2eval_pathcount.png` panel (b) — the dotted "fit" is not the fit
+`t(N) = a + bN` is a straight line in linear coordinates; this panel is log–log.
+The line was drawn from its two endpoints, `(2, 0.493)` and `(6554, 33.3)`,
+which on log–log axes renders a **power law through those endpoints**, not the
+fitted line. At `N = 96` the drawn line reads 3.70 ms where the fit and the
+measurement both read 0.96 — a factor of 3.9. That is why the fit appears to
+miss every point it was fitted to. Sampling it on a dense grid puts it back on
+the data. The fit itself is fine: `R² = 0.990`, every point within 5 %.
+
+The same two-point call is in `rl-mpquic/scripts/thesis_figures.py`, so the
+published figure has the bug at source.
+
+Keep the linear fit — there is a reason for it beyond curve-fitting. The
+transport agent scores each path with one shared encoder evaluated `N` times, so
+the cost model the architecture *implies* is a fixed part (observation build,
+softmax, Python overhead) plus a per-path part: exactly `a + bN`. The fit
+measures `a` and `b` rather than choosing a functional form, and the point of
+the paragraph — that `a` dominates `bN` over the whole useful range — is a
+statement about those two coefficients. A power law or a log fit would have no
+such reading.
+
+The legend was also too wide for the panel, because the fit's label was twice
+the width of any other entry. The fit is now annotated on the curve and the
+legend holds the four measurement series.
+
 ### `p1eval_probing.png` — five methods were plotted on top of each other
 Shortest-path, lowest-latency, ECMP, the SCION default, and random all cost
 exactly 360 ms per selection, so on the old linear x-axis their markers and
 labels collapsed into one unreadable cluster while 90 % of the panel was empty.
-Now: log x-axis, no legend, and each point carries its own label on a leader
-line. Also relabelled — see "units and names" below.
+Now: log x-axis, and each point carries its value on a leader line, with the
+legend back at bottom right (as in the published figure) carrying the names.
+Also relabelled — see "units and names" below.
 
 **This one needs a `.tex` change too:** the figure is currently included at
 `width=0.72\linewidth`, which shrinks the point labels below legibility. Change
@@ -58,8 +84,10 @@ the nine full policy names collided into an illegible pile (visible on p. 73 of
 the current PDF).
 
 Note the numbers this figure prints: **0.575** for the learned split and
-**0.577** for path-only. The text beside it says 0.507 ms. See the `\gap` in
-`sections/5_multipath.tex`.
+**0.577** for path-only. The text used to say 0.507 ms, which is not a number
+any run on disk carries; it now quotes **0.536 ms**, the same statistic pooled
+over the nine cells at six paths (`runs/pc-report.json`), which is the pool the
+0.713 ms p99 in the same paragraph already came from.
 
 ### `p2eval_path_mechanism.png` — legend over the data
 The six-path legend sat inside panel (a) and covered path 0's goodput trace over
@@ -74,7 +102,9 @@ over the middle of the congestion range. It is now shared, below both panels.
 Four collisions, all worse for the `\resizebox`: the "per-path state" label sat
 on the Transport agent box and ran off the right edge; "path N (live/dead)" was
 wider than its box; "target bitrate" sat on its arrow; and the two reward return
-paths shared a lane. The `.tex` here is a standalone preview — to adopt it,
+paths shared a lane. The delivery-reward lane now returns over the top of the
+path column — its first redraw still rose at `x = 8.15`, which grazed the scorer
+box and cut across all three fan-out arrows. The `.tex` here is a standalone preview — to adopt it,
 replace the `tikzpicture` inside the `figure` environment in
 `sections/5_multipath.tex` and keep the existing `\caption`/`\label`.
 
@@ -86,9 +116,8 @@ replace the `tikzpicture` inside the `figure` environment in
 This is the one substantive change. The published figure is the *single-run*
 rendering; every other Chapter 4 figure was regenerated at five seeds on
 2026-07-31 and this one was not (`figures/` mtimes show it). The version here is
-the five-seed rendering the pipeline already produces, plus per-seed mean ticks,
-a CI on the loss-exposure bars, and staggered labels (the three `0.48%` labels
-touched).
+the five-seed rendering the pipeline already produces, plus a CI on the
+loss-exposure bars and staggered labels (the three `0.48%` labels touched).
 
 Adopting it changes three numbers in the surrounding prose — see the `\gap` at
 the seed-protocol paragraph in `sections/4_single_path.tex`. If you would rather

@@ -174,7 +174,10 @@ def probing(csv_path, out):
         ax_, ay, ha = anchors.get(m, (x * 1.6, y, "left"))
         leader = dict(arrowstyle="-", color=c, lw=0.7,
                       shrinkA=1, shrinkB=6, alpha=0.8)
-        ax.annotate(f"{r['method_label']}  {y/1000:.1f} Gbit/s",
+        # The legend carries the names (as in the published figure); the leader
+        # lines carry the values, which is what the five coincident heuristics
+        # at 360 ms need in order to be read at all.
+        ax.annotate(f"{y/1000:.1f} Gbit/s",
                     xy=(x, y), xytext=(ax_, ay), fontsize=7.5, color=c,
                     ha=ha, va="center", arrowprops=leader)
     ax.set_xscale("log")
@@ -190,9 +193,9 @@ def probing(csv_path, out):
     ax.set_title("Bars: 95% CI over 5 training seeds. The heuristics are "
                  "deterministic and identical in every seed.",
                  fontsize=6.5, color="#333333", loc="left")
-    # No legend: every marker carries its own label, which is what the old
-    # legend was for, and the five coincident heuristics need the leader lines
-    # to be told apart at all.
+    ax.legend(loc="lower right", fontsize=7.5, frameon=True, framealpha=0.9,
+              edgecolor="#cccccc", borderpad=0.5, labelspacing=0.35,
+              handletextpad=0.5)
     fig.tight_layout()
     fig.savefig(out, dpi=300, bbox_inches="tight")
     plt.close(fig)
@@ -262,11 +265,6 @@ def boxplots(box_csv, summary_csv, out):
                 patch.set_linewidth(2.2 if i == target else 1.0)
             for med in bp["medians"]:
                 med.set_color("black")
-        for x, i in zip(pos, INTENT_ORDER):
-            v = seedvals(summ[i], scol)
-            if v.size:
-                ax.scatter(np.full(v.size, x), v, color="#111111", marker="_",
-                           s=90, linewidths=1.3, zorder=6)
         ax.set_ylabel(ylab, fontsize=8)
         ax.set_title(f"{summ[target]['intent_label']} intent \u2192 {better}",
                      fontsize=8, color="#333333")
@@ -274,9 +272,6 @@ def boxplots(box_csv, summary_csv, out):
         ax.set_xticklabels(labels, rotation=35, ha="right", fontsize=8)
         ax.grid(axis="y", alpha=0.3)
 
-    axes[0].text(0.02, 0.02, "\u2014 = per-seed mean (5 seeds)",
-                 transform=axes[0].transAxes, fontsize=6.5, va="bottom",
-                 color="#333333")
     fig.savefig(out, dpi=300, bbox_inches="tight")
     plt.close(fig)
     print("wrote", out)

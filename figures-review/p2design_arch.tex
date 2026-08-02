@@ -13,7 +13,10 @@
 %   * "target bitrate" sat on the arrow between the two agent boxes; the gap is
 %     wider and the label sits above the arrow;
 %   * the two reward return paths ran at nearly the same height and their labels
-%     touched the dashed lines; they now have separate lanes;
+%     touched the dashed lines; the delivery reward now returns over the top of
+%     the path column (it used to rise at x = 8.15, grazing the scorer box and
+%     cutting across all three fan-out arrows) and the application reward has
+%     the bottom lane to itself;
 %   * \resizebox is gone. The picture is laid out at 0.86 of its natural size,
 %     so the small labels stay above 6pt at \linewidth instead of being scaled
 %     to whatever the width demanded.
@@ -73,12 +76,17 @@
   \draw[sig] (p1.north) |- (tr.east);
   \node[lbl, anchor=east] at (11.35,2.45)
     {per-path state:\\ cwnd, sRTT, buffer,\\ throughput, loss};
-  % --- feedback: per-frame delivery reward, own lane at y = -2.1 ---
-  \draw[sig] (rx.south) -- (15.0,-2.1) -- node[lbl, pos=0.45, below]
-    {per-frame delivery reward} (8.15,-2.1) -- (8.15,3.0) -- (tr.south east);
-  % --- feedback: application reward, own lane at y = -3.0 ---
-  \draw[sig] (15.0,-2.1) -- (15.0,-3.0) -- node[lbl, pos=0.5, below]
+  % --- feedback: per-frame delivery reward, own lane above the path column ---
+  % It used to run back at y = -2.1 and rise at x = 8.15, which grazed the
+  % scorer box and cut across all three fan-out arrows. It now returns over the
+  % top, where the only thing at that height is empty space.
+  \coordinate (trtop) at ($(tr.north)!0.8!(tr.north east)$);
+  \coordinate (rlane) at (15.0,4.9);
+  \draw[sig] (rx.north) -- (rlane) -- node[lbl, pos=0.5, above]
+    {per-frame delivery reward} (trtop |- rlane) -- (trtop);
+  % --- feedback: application reward, own lane below everything ---
+  \draw[sig] (rx.south) -- (15.0,-2.4) -- node[lbl, pos=0.5, below]
     {application reward: VMAF, latency, jitter, loss over the window its bitrate governed}
-    (-2.9,-3.0) -- (-2.9,3.4) -- (app.west);
+    (-2.9,-2.4) -- (-2.9,3.4) -- (app.west);
 \end{tikzpicture}
 \end{document}

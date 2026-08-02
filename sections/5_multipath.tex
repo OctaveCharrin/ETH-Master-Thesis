@@ -917,28 +917,15 @@ first.
 \paragraph{The per-frame inference cost fits the frame budget with three orders of magnitude to
 spare.} The transport agent is the design's one hard real-time component: it runs once per frame, so
 its inference must complete well inside \SI{33}{\milli\second} at 30\,fps.
-\Cref{fig:p2eval:decision} measures it across methods. The learned split decision costs
-\SI{0.507}{\milli\second} on average on a 16-core CPU host with no GPU, tightly distributed across
-frames --- about 1.5\% of the frame budget, and roughly $23\times$ the cost of the cheapest fixed rule
-(even split, at \SI{0.0123}{\milli\second}), which is nonetheless an irrelevant difference at this
-scale.
-\gap{the \SI{0.507}{\milli\second} in this paragraph, in \cref{fig:p2eval:decision}'s caption, in the
-extrapolation paragraph below, and in \cref{sec:analysis:overhead} is not a number any run on disk
-carries, and the figure beside it contradicts it: the evaluation cell the figure is drawn from
-(\texttt{ab-prof2-evinteractive-trinteractive/interactive/seed-1000-t1}) reports
-\SI{0.5748}{\milli\second} for the learned split and \SI{0.5766}{\milli\second} for the path-only arm,
-and the figure prints both. The two other measurements of the same quantity are
-\SI{0.5356}{\milli\second} (in-episode, pooled over the nine cells at $N = 6$, \texttt{pc-report.json})
-and \SI{0.495}{\milli\second} (micro-benchmark, \texttt{pc-decision-bench.json}). Pick one of the three
-and say which it is, then propagate: the ratio to the even split becomes $48\times$ rather than
-$23\times$ (\SI{0.575}{\milli\second} over \SI{0.012}{\milli\second}; even the stale figure gives
-$41\times$, so $23\times$ is wrong under every reading), and the share of the frame budget becomes
-1.7\% rather than 1.5\%. The fitted intercept \SI{0.483}{\milli\second} and the $N \approx 6500$
-crossover are unaffected, since they come from the micro-benchmark.}
-The application agent's bitrate decision is cheaper still and runs 30 times less often. Pooled
-over the 40{,}500 calls of a full nine-cell grading at six paths, the 99th percentile is
+\Cref{fig:p2eval:decision} measures it across methods. Pooled over the 40{,}500 calls of a full
+nine-cell grading at six paths, the learned split decision costs \SI{0.536}{\milli\second} on average on
+a 16-core CPU host with no GPU, tightly distributed across frames --- about 1.6\% of the frame budget,
+and roughly $43\times$ the cost of the cheapest fixed rule (even split, at \SI{0.0124}{\milli\second}),
+which is nonetheless an irrelevant difference at this scale.
+Over the same pool the 99th percentile of the split decision is
 \SI{0.713}{\milli\second} and the 99.9th under \SI{3.6}{\milli\second}, so the tail that a real-time
-claim actually rests on stays 10--45$\times$ inside the budget. The paragraph after next measures how that cost scales with the
+claim actually rests on stays 10--45$\times$ inside the budget. The application agent's bitrate decision
+is cheaper still and runs 30 times less often. The paragraph after next measures how that cost scales with the
 path count, and reports the one part of the distribution that does not fit comfortably.
 
 \begin{figure}[tbp]
@@ -948,8 +935,10 @@ path count, and reports the one part of the distribution that does not fit comfo
   EPYC 7702P with 16 cores allocated, \SI{32}{\gibi\byte} of RAM, and no GPU, running PyTorch on the
   CPU. (a) Mean cost of the bitrate decision and
   of the split decision, on a log scale. (b) Distribution of the per-frame split decision, the design's
-  binding real-time constraint. The learned split costs \SI{0.507}{\milli\second} on average against a
-  \SI{33}{\milli\second} frame budget at 30\,fps. Decision time is a property of the host rather than of
+  binding real-time constraint. In this cell the learned split costs \SI{0.575}{\milli\second} on
+  average against a \SI{33}{\milli\second} frame budget at 30\,fps; the \SI{0.536}{\milli\second} quoted
+  in the text is the same statistic pooled over the nine cells at six paths
+  (\texttt{runs/pc-report.json}). Decision time is a property of the host rather than of
   the training seed --- the three checkpoints agree to within \SI{0.05}{\milli\second} at every path
   count --- so this single evaluation cell is representative; \cref{fig:p2eval:pathcount}(b) gives the
   same statistic pooled over all nine cells and as a function of the path count. Source:
@@ -969,8 +958,8 @@ t(N) = 0.483 + 0.00501\,N\ \text{ms}, \qquad R^2 = 0.990,
 \end{equation}
 so the cost is indeed linear in the path count --- but \textbf{94\% of it at six paths is the constant},
 and the marginal cost of a path is \SI{5.0}{\micro\second}. The frame budget is therefore reached near
-$N \approx 6500$, not the ${\approx}200$ this chapter previously inferred from the same
-\SI{0.507}{\milli\second} mean by assuming the cost was proportional to $N$. The correction is in the
+$N \approx 6500$, not the ${\approx}200$ this chapter previously inferred from the six-path mean by
+assuming the cost was proportional to $N$. The correction is in the
 conservative direction and the right sentence is not ``linear in $N$'' but ``a fixed
 ${\approx}\SI{0.48}{\milli\second}$ plus \SI{5}{\micro\second} per path''.
 

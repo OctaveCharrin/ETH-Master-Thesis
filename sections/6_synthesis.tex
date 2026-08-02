@@ -205,8 +205,8 @@ ample: timing only the decision itself, over 1280~held-out contexts of 30~candid
 average and under \SI{2}{\milli\second} at the 99th percentile across repeated runs. That is three orders
 of magnitude inside a path-selection budget of seconds to minutes, and comfortably inside a
 \SI{33}{\milli\second} video frame. The multipath transport agent, whose per-frame budget is the
-tighter of the two, has the same shape of answer: it decides in \SI{0.507}{\milli\second} on average
-on a 16-core CPU host with no GPU, about 1.5\% of the frame interval it must fit inside, and
+tighter of the two, has the same shape of answer: it decides in \SI{0.536}{\milli\second} on average
+on a 16-core CPU host with no GPU, about 1.6\% of the frame interval it must fit inside, and
 \SI{0.71}{\milli\second} at the 99th percentile over the 40{,}500 decisions of a full nine-cell grading
 (\cref{fig:p2eval:decision,sec:p2eval:pathcount}). Both controllers are therefore compute-bound nowhere
 near their deadlines. The cost grows linearly in the candidate count in each case, since the shared

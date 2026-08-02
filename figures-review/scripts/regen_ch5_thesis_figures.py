@@ -439,11 +439,15 @@ def cmd_pathcount(args) -> None:
     cross = fit["crossover_n"] or max(bn)
     # The fitted line is drawn all the way out to the budget crossing: the panel
     # exists to show the margin, and the margin is three orders of magnitude.
-    xs = np.array([min(bn), cross])
+    # It must be sampled densely: t(N) = a + bN is a straight line in linear
+    # coordinates, not in the log-log ones this panel uses. Drawing it from its
+    # two endpoints -- which is what the published figure does -- renders a power
+    # law through those endpoints instead, putting the "fit" at 3.70 ms at
+    # N = 96 where both the fit and the measurement are 0.96. That is why the
+    # line appears to miss every point it was fitted to.
+    xs = np.logspace(np.log10(min(bn)), np.log10(cross), 500)
     a2.plot(xs, fit["intercept_ms"] + fit["slope_ms_per_path"] * xs,
-            color="#1f77b4", linewidth=0.9, linestyle=":", zorder=1,
-            label=(f"fit ${fit['intercept_ms']:.3f}+{fit['slope_ms_per_path']:.4f}N$"
-                   f", $R^2$={fit['r2']:.3f}"))
+            color="#1f77b4", linewidth=0.9, linestyle=":", zorder=1)
     a2.plot(bn, [r["mean_ms"] for r in bench["rows"]], color="#1f77b4",
             marker="o", markersize=4, linewidth=1.4, zorder=3,
             label="micro-benchmark, mean")
@@ -466,15 +470,23 @@ def cmd_pathcount(args) -> None:
     a2.annotate(f"fit reaches budget\nat $N\\approx{cross:.0f}$",
                 (cross, budget), xytext=(-4, -22), textcoords="offset points",
                 fontsize=7, ha="right", color="#1f77b4")
+    # The fit is annotated on the curve rather than in the legend: as a legend
+    # entry its label is twice the width of any other and forced the box past
+    # the panel's right edge.
+    a2.text(0.975, 0.03,
+            f"fit ${fit['intercept_ms']:.3f} + {fit['slope_ms_per_path']:.4f}N$\n"
+            f"$R^2 = {fit['r2']:.3f}$",
+            transform=a2.transAxes, fontsize=6.6, color="#1f77b4",
+            ha="right", va="bottom", linespacing=1.35)
     a2.set_xscale("log")
     a2.set_yscale("log")
     a2.set_xlabel("Path count $N$")
     a2.set_ylabel("Transport-agent decision time (ms, log)")
     a2.set_title("(b) Decision time vs. path count")
     a2.grid(alpha=0.3, which="both")
-    a2.legend(fontsize=6.4, loc="upper left", ncol=2, handlelength=1.5,
-              borderpad=0.35, labelspacing=0.3, columnspacing=1.0,
-              framealpha=0.95)
+    a2.legend(fontsize=6.4, loc="upper left", ncol=2, handlelength=1.3,
+              borderpad=0.3, labelspacing=0.25, columnspacing=0.8,
+              handletextpad=0.4, framealpha=0.95)
     a2.set_ylim(top=budget * 6.0)
     _save(fig, args.out)
 
