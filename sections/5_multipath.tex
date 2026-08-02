@@ -23,8 +23,19 @@ portable to any multipath substrate, which is a strength. And the natural union 
 halves --- a learned selector choosing which paths to place under a learned scheduler --- is
 consequently untested, which is the honest form of the future-work item in \cref{ch:conclusion}.
 
-Three findings organize the chapter. Neither decision can be made well alone: removing either agent
-forfeits most of the achievable quality. The value of making them jointly is governed not by whether the
+Three findings organize the chapter. Neither decision can be made well alone: removing the transport
+agent forfeits most of the achievable quality and removing the application agent forfeits a fifth of
+it.
+\gap{``removing \emph{either} agent forfeits most of the achievable quality'' is stated in this
+paragraph, in the abstract, in \cref{sec:intro:approach}, in \cref{sec:disc:interpretation}, and in
+\cref{ch:conclusion}, and \cref{sec:p2eval:ablation} contradicts it in one direction: removing the
+transport agent costs 65\% under \texttt{interactive} but only 16\% under \texttt{passive}, and
+removing the \emph{application} agent costs 10\% and 16\% on the mock and 20\% on the packet-level
+body. ``Most'' holds for one of the two halves at one of the three intents. Either weaken all five
+occurrences to the asymmetric statement used here, or replace ``most'' with the measured range
+(10--65\%). The stronger claim the evidence does support is the ranking one --- neither ablation ranks
+first in any cell where the pair does --- and it may be worth promoting that instead.}
+The value of making them jointly is governed not by whether the
 network is moving but by how unevenly capacity is distributed across the paths and by how strictly the
 application prices delay --- two axes that turn out to interact rather than add, and that together bound
 where the system's advantage exists at all. And a \emph{single} policy conditioned on the application's intent does the
@@ -88,6 +99,15 @@ sample efficiency suit these controls and the cost of simulator rollouts.
 \Cref{fig:p2design:arch} gives the whole design in one picture: the two cadences, what each agent
 observes, the bitrate signal that makes the pair hierarchical rather than merely concurrent, and the
 two reward signals. The sections that follow specify each of its parts.
+\gap{the drawing below collides with itself in four places at the size it is set. The ``per-path
+state: cwnd, sRTT, buffer, throughput, loss'' label sits on the Transport agent box and runs past the
+picture's right edge; ``path $N$ (live/dead)'' is wider than the box that holds it and spills out both
+sides; ``target bitrate'' sits on the arrow between the two agent boxes rather than above it; and the
+two reward return paths share a lane so their labels touch the dashed lines. The \texttt{resizebox}
+compounds all four, because it scales the \texttt{lbl} text to whatever the width demands rather than
+to a legible size. A redrawn version that fixes the four and drops the \texttt{resizebox} is in
+\texttt{figures-review/p2design\_arch.tex}, with a rendered preview beside it; adopting it means
+replacing the \texttt{tikzpicture} below and keeping this caption unchanged.}
 
 \begin{figure}[t]
   \centering
@@ -502,7 +522,7 @@ follow-up work.
 \section{Experimental Evaluation: Regimes of Value}
 \label{sec:mp:eval}
 
-This section evaluates the multipath system and answers eight questions in turn.
+This section evaluates the multipath system and answers nine questions in turn.
 \Cref{sec:p2eval:setup} fixes the setup, the nine policies compared, and the statistical protocol.
 \Cref{sec:p2eval:results} asks whether the learned pair beats every baseline, and under which
 application intents, and \cref{sec:p2eval:head} asks what produces that margin --- establishing that
@@ -513,7 +533,9 @@ named for --
 scenario label. \Cref{sec:p2eval:transfer} asks whether the three intents produce genuinely different
 policies or merely relabel the reward, and \cref{sec:p2eval:conditioning} asks the thesis's own
 question of this system: whether one policy conditioned on the intent can replace the three that bake it
-in. \Cref{sec:p2eval:ns3} asks whether any of it survives \emph{transfer} to a packet-level transport
+in. \Cref{sec:p2eval:switch} then asks the question the fixed-intent measurements structurally cannot,
+whether conditioning is \emph{necessary} rather than merely harmless when the application changes its
+intent mid-connection. \Cref{sec:p2eval:ns3} asks whether any of it survives \emph{transfer} to a packet-level transport
 stack --- the answer is that it survives for half the training seeds and mock score cannot say which
 half --- and \cref{sec:p2eval:ns3native} asks the question that leaves open, whether the system learns
 on that stack when trained there. \Cref{sec:p2eval:ablation} isolates the remaining design choices,
@@ -899,7 +921,21 @@ its inference must complete well inside \SI{33}{\milli\second} at 30\,fps.
 \SI{0.507}{\milli\second} on average on a 16-core CPU host with no GPU, tightly distributed across
 frames --- about 1.5\% of the frame budget, and roughly $23\times$ the cost of the cheapest fixed rule
 (even split, at \SI{0.0123}{\milli\second}), which is nonetheless an irrelevant difference at this
-scale. The application agent's bitrate decision is cheaper still and runs 30 times less often. Pooled
+scale.
+\gap{the \SI{0.507}{\milli\second} in this paragraph, in \cref{fig:p2eval:decision}'s caption, in the
+extrapolation paragraph below, and in \cref{sec:analysis:overhead} is not a number any run on disk
+carries, and the figure beside it contradicts it: the evaluation cell the figure is drawn from
+(\texttt{ab-prof2-evinteractive-trinteractive/interactive/seed-1000-t1}) reports
+\SI{0.5748}{\milli\second} for the learned split and \SI{0.5766}{\milli\second} for the path-only arm,
+and the figure prints both. The two other measurements of the same quantity are
+\SI{0.5356}{\milli\second} (in-episode, pooled over the nine cells at $N = 6$, \texttt{pc-report.json})
+and \SI{0.495}{\milli\second} (micro-benchmark, \texttt{pc-decision-bench.json}). Pick one of the three
+and say which it is, then propagate: the ratio to the even split becomes $48\times$ rather than
+$23\times$ (\SI{0.575}{\milli\second} over \SI{0.012}{\milli\second}; even the stale figure gives
+$41\times$, so $23\times$ is wrong under every reading), and the share of the frame budget becomes
+1.7\% rather than 1.5\%. The fitted intercept \SI{0.483}{\milli\second} and the $N \approx 6500$
+crossover are unaffected, since they come from the micro-benchmark.}
+The application agent's bitrate decision is cheaper still and runs 30 times less often. Pooled
 over the 40{,}500 calls of a full nine-cell grading at six paths, the 99th percentile is
 \SI{0.713}{\milli\second} and the 99.9th under \SI{3.6}{\milli\second}, so the tail that a real-time
 claim actually rests on stays 10--45$\times$ inside the budget. The paragraph after next measures how that cost scales with the
@@ -1297,8 +1333,10 @@ reliably --- which the intervention did not change.
 
 \paragraph{The conditioned policy interpolates across a continuum of intents.} Sweeping the intent
 linearly from \texttt{interactive} ($\lambda = 0$) to \texttt{passive} ($\lambda = 1$) in eleven steps,
-over all six training seeds of each arm, both arms trade delay for quality smoothly and monotonically
-(\cref{fig:p2eval:intentsweep}). Achieved bitrate rises from 2379 to \SI{3505}{\kilo\bit\per\second}
+over all six training seeds of each arm, both arms trade delay for quality smoothly, and, in the pooled mean, monotonically on rate and
+quality (\cref{fig:p2eval:intentsweep}); delivered latency is monotone for the global-only arm and not
+for the per-path one, which is the subject of the tie-breaker paragraph below.
+Achieved bitrate rises from 2379 to \SI{3505}{\kilo\bit\per\second}
 (per-path) and 3003 to \SI{3679}{\kilo\bit\per\second} (global-only), with no single step of the sweep
 carrying more than a quarter of the trend. Because the intent bundle contains the deadline, the raw
 metrics move even for a policy that ignores the intent entirely, so the de-confounded statistic is the

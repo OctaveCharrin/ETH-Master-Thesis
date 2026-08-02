@@ -72,7 +72,7 @@ reported in \cref{sec:p2eval:ablation,sec:p2eval:pathcount} and synthesized in
 We explicitly state the operating assumptions underlying our design:
 
 \begin{enumerate}
-  \item \textbf{Path-Aware Substrate.} The underlying network exposes multiple distinct end-to-end paths to the endpoint and honors source routing decisions, as provided by SCION. We do not assume control over internal intra-AS routing decisions.
+  \item \textbf{Path-Aware Substrate.} The underlying network exposes multiple distinct end-to-end paths to the endpoint and honors source routing decisions, as provided by SCION. We do not assume control over internal intra-AS routing decisions. The two studies lean on this assumption to different depths, which is worth stating here rather than leaving to be discovered: \cref{ch:single_path} runs on a generated SCION topology with beaconing and segment composition, so its candidate sets are the ones a SCION control plane would produce, whereas \cref{ch:multipath} assumes only the \emph{path multiplicity} such an architecture makes routine and runs on a hand-specified path configuration with no control plane at all (\cref{sec:mp:eval,tab:app:p2topo}).
   
   \item \textbf{Observable Path Feedback.} Per-path metrics (latency, loss, bandwidth) are measurable via active probing (in single-path selection) or derived continuously from transport feedback (e.g., QUIC ACK frames and RTT samples).
   

@@ -514,8 +514,9 @@ raises, in turn: where must intent enter for conditioning to have any effect
 the intent changes (\cref{sec:p1eval:intent})? Does it generalize to intents it never trained on
 (\cref{sec:p1eval:zeroshot})? Does the scoring architecture in fact deliver the dynamic-action property
 it was chosen for (\cref{sec:p1eval:dynamic})? And does it retain the high-quality-at-low-probing
-property of the selector it builds on (\cref{sec:p1eval:overhead})? \Cref{sec:p1eval:ceiling} then turns
-to the limit that motivates the next chapter.
+property of the selector it builds on (\cref{sec:p1eval:overhead})? \Cref{sec:p1eval:limits} then
+collects what re-measuring the chapter over five training seeds changed, and \cref{sec:p1eval:ceiling}
+turns to the limit that motivates the next chapter.
 
 \subsection{Experimental Setup}
 \label{sec:p1eval:setup}
@@ -576,6 +577,17 @@ the environment's pair, hour, and profile streams are held fixed, so every seed 
 of training contexts and only the learning process varies. And all five seeds are graded on the same
 10752~held-out decision contexts, loaded once and handed to every study of every seed.
 
+\gap{\cref{fig:p1eval:boxplots} is a fourth exception and is not listed here. Its box bodies and its
+fourth panel are drawn from the single reference run, as its own caption says, while the sentence above
+claims that ``\emph{every} quantitative result reported below'' is a five-seed mean and then names six
+floats, not seven. Either add it to the exception list in the next paragraph, or --- better --- adopt
+the five-seed rendering, which the pipeline already produces and which is staged in
+\texttt{figures-review/}. Adopting it changes three numbers in the surrounding text: the fourth panel's
+Low-Latency bar reads 4.51\% rather than 4.91\%, the Low-Loss bar reads 0.76\% rather than sitting on
+the 0.48\% floor, and the caveat sentences that exist only to undo the single-run rendering (``Shapes
+are drawn from the single reference run\ldots'' in the caption, and ``Low-Loss sits on that floor in
+the run the figure is drawn from but not in general'' in \cref{sec:p1eval:intent}) can be deleted
+rather than rewritten.}
 Three floats are the exception and are marked where they appear. \Cref{tab:p1eval:ablation} reports the
 single reference run, because it carries the full four-intent grid and its two discriminating columns
 are re-reported over seeds in \cref{tab:p1eval:seeds} immediately after. \Cref{tab:p1eval:heldout} and
@@ -1016,7 +1028,7 @@ puts under a third of it there. This is the claim the test was built to make, an
 31\% rather than at the reference run's 24.7\%, which was near the favorable end of the seed
 distribution. The endpoints reproduce the trained-profile behavior, matching the Throughput and
 Low-Latency rows of \cref{sec:p1eval:intent}, and the extrapolated points continue the trend rather than
-diverging -- \SI{11.98}{\milli\second} [11.43, 12.53] at $t = 1.2$, beyond any trained intent.
+diverging --- \SI{11.98}{\milli\second} [11.43, 12.53] at $t = 1.2$, beyond any trained intent.
 
 Two further observations. First, the same sweep on the 32~structurally held-out pairs of
 \cref{sec:p1eval:setup} reproduces the result: \SI{24.76}{\milli\second} to \SI{19.16}{\milli\second},
@@ -1203,6 +1215,15 @@ This chapter was first drafted from a single reference training run and then re-
 following the rule \cref{sec:p2eval:seeds} derives from the next chapter's retractions. Five sharp claims
 did not survive, and we collect them here rather than leaving a reader to reconstruct which numbers moved.
 They divide into two kinds, and the distinction is the useful part.
+\gap{the count does not add up, and it propagates. This subsection promises ``five sharp claims'' and
+then enumerates \emph{six} --- three under ``stated as exact'' and three under ``read off the best
+seed''. \Cref{sec:p1eval:setup} repeats ``five claims'', \cref{ch:conclusion} says ``five more in
+\cref{ch:single_path}'', and \cref{sec:intro:contributions} totals ``ten results in this thesis''
+(five here, five in \cref{ch:multipath}), so the total is either 10 or 11 depending on which reading is
+right. A seventh candidate is loose as well: \cref{sec:p1eval:ablation} reports that the
+Value-Concat/unconditioned-scorer ordering on Throughput does not reproduce, which is the same kind of
+retraction but is not collected here. Decide whether the count is six or seven, then fix it in all four
+places.}
 
 \paragraph{Claims stated as exact that are not.} The intent-alignment diagonal wins two of four columns
 across seeds rather than all four (\cref{sec:p1eval:intent}); the zero-shot Spearman correlation is

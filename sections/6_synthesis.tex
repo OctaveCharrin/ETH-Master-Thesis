@@ -48,9 +48,9 @@ deficit and tightens the training-seed spread (\cref{sec:p2eval:conditioning}). 
 when conditioning is routed into per-alternative terms, audit the \emph{preprocessing} for the same
 signal.
 
-\paragraph{The two decisions are not separable.} Removing either agent forfeits most of the achievable
-QoE: an application agent over a naive split recovers as little as 35\% of the joint system, and a
-learned split under a conventional bitrate controller as little as 84\%
+\paragraph{The two decisions are not separable.} Removing either agent costs measurable QoE, and the
+two halves cost asymmetrically: an application agent over a naive split recovers as little as 35\% of
+the joint system, and a learned split under a conventional bitrate controller as little as 84\%
 (\cref{sec:p2eval:ablation}). Rate and split are coupled through the same bottleneck, and a controller
 that fixes either is optimizing against a constraint it could have moved. Two qualifications travel with
 this. The recovery ratios hold only inside the regime where the system works, since on a harsher network

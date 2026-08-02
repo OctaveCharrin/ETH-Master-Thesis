@@ -11,8 +11,9 @@ general flows, and, for real-time video, jointly choosing how much traffic each 
 The strongest result is that the two decisions cannot be made well apart. A two-timescale pair of
 reinforcement-learning agents co-optimizing a video call's encoding bitrate and its per-path split over
 Multipath QUIC beats all eight comparison points under all three application intents --- among them
-minRTT and a WebRTC-style deployed stack --- by 0.065 to 0.143 QoE, three to seven times the spread
-between training runs; removing either agent forfeits most of the achievable quality. What makes this
+minRTT and a WebRTC-style deployed stack --- leading the closest of them, that WebRTC-style stack, by
+0.065 to 0.143 QoE, three to seven times the spread between training runs; removing the transport agent
+forfeits most of the achievable quality and removing the application agent a fifth of it. What makes this
 possible is architectural: replacing the permutation-equivariant head that scores every path with shared
 weights by a fixed-dimension one costs 0.231 QoE and drops the system from first in nine of nine
 evaluation cells to none, where the shared-weight policy runs unmodified from two paths to twelve
@@ -32,7 +33,7 @@ routings carry a guarantee, not which happen to work.
 What governs the payoff of joint control is not whether the network is moving but how unevenly capacity
 is spread across paths and how strictly the application prices delay --- and that map bounds our
 headline claim: it holds on a milder held-out network and fails on a harsher one. Transferred zero-shot
-to a packet-level backend only three of six independently trained policies keep their ranking, and
+to a packet-level backend, only three of six independently trained policies keep their ranking, and
 surrogate score does not predict which; trained on that backend instead, the pair leads every
 comparison point in nine of nine cells and beats transfer by 0.228 QoE. A cheap surrogate is therefore
 useless for choosing among the policies it produces, and not free to train in either. Throughout, the
