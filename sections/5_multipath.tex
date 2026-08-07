@@ -99,50 +99,40 @@ sample efficiency suit these controls and the cost of simulator rollouts.
 \Cref{fig:p2design:arch} gives the whole design in one picture: the two cadences, what each agent
 observes, the bitrate signal that makes the pair hierarchical rather than merely concurrent, and the
 two reward signals. The sections that follow specify each of its parts.
-\gap{the drawing below collides with itself in four places at the size it is set. The ``per-path
-state: cwnd, sRTT, buffer, throughput, loss'' label sits on the Transport agent box and runs past the
-picture's right edge; ``path $N$ (live/dead)'' is wider than the box that holds it and spills out both
-sides; ``target bitrate'' sits on the arrow between the two agent boxes rather than above it; and the
-two reward return paths share a lane so their labels touch the dashed lines. The \texttt{resizebox}
-compounds all four, because it scales the \texttt{lbl} text to whatever the width demands rather than
-to a legible size. A redrawn version that fixes the four and drops the \texttt{resizebox} is in
-\texttt{figures-review/p2design\_arch.tex}, with a rendered preview beside it; adopting it means
-replacing the \texttt{tikzpicture} below and keeping this caption unchanged.}
 
 \begin{figure}[t]
   \centering
-  \resizebox{\linewidth}{!}{%
   \begin{tikzpicture}[
-    font=\small,
+    scale=0.86, every node/.style={transform shape}, font=\small,
     box/.style={draw, rounded corners=2pt, align=center, inner sep=4pt},
     agent/.style={box, thick, draw=eth1, fill=eth1!7},
     unit/.style={box, fill=black!4},
-    pathb/.style={box, fill=eth10!25, minimum width=26mm, minimum height=6mm},
+    pathb/.style={box, fill=eth10!25, minimum width=30mm, minimum height=7mm},
     flow/.style={-{Latex[length=2.2mm]}, semithick},
     sig/.style={-{Latex[length=2.2mm]}, semithick, densely dashed, draw=eth7},
     lbl/.style={font=\scriptsize, align=center, inner sep=2pt},
   ]
     % --- intent ---
-    \node[box, draw=eth5, fill=eth5!8] (intent) at (2.9,5.0)
+    \node[box, draw=eth5, fill=eth5!8] (intent) at (3.4,5.4)
       {\textbf{Application intent}: $(b,c,d)$, frame deadline, normalizers};
     % --- agents ---
-    \node[agent] (app) at (0,3.1)
+    \node[agent] (app) at (0,3.4)
       {\textbf{Application agent} (SAC)\\ slow: every \SI{1}{\second}};
-    \node[agent] (tr) at (5.9,3.1)
+    \node[agent] (tr) at (7.0,3.4)
       {\textbf{Transport agent} (SAC)\\ fast: every frame (${\approx}\SI{33}{\milli\second}$)};
     % --- data plane ---
     \node[unit] (enc) at (0,0.0) {Video encoder\\ 30\,fps, no buffer};
-    \node[unit] (spl) at (5.9,0.0) {Per-path scorer\\ $\rightarrow$ masked softmax};
-    \node[pathb] (p1) at (10.1,0.95) {path 1};
-    \node[pathb] (p2) at (10.1,0.0) {$\vdots$};
-    \node[pathb] (p3) at (10.1,-0.95) {path $N$ (live/dead)};
-    \node[unit] (rx) at (13.1,0.0) {Receiver};
+    \node[unit] (spl) at (7.0,0.0) {Per-path scorer\\ $\rightarrow$ masked softmax};
+    \node[pathb] (p1) at (11.6,1.05) {path 1};
+    \node[pathb] (p2) at (11.6,0.0) {$\vdots$};
+    \node[pathb] (p3) at (11.6,-1.05) {path $N$\\[-1pt] {\scriptsize live or dead}};
+    \node[unit] (rx) at (15.0,0.0) {Receiver};
     % --- intent into both agents ---
-    \draw[sig] (intent.south) -- ++(0,-0.45) -| (app.north);
-    \draw[sig] (intent.south) -- ++(0,-0.45) -| (tr.north);
+    \draw[sig] (intent.south) -- ++(0,-0.6) -| (app.north);
+    \draw[sig] (intent.south) -- ++(0,-0.6) -| (tr.north);
     % --- control flow ---
     \draw[flow] (app.south) -- node[lbl, left] {target bitrate\\ \SIrange{300}{6000}{\kilo\bit\per\second}} (enc.north);
-    \draw[flow] (app.east) -- node[lbl, above] {target\\ bitrate} (tr.west);
+    \draw[flow] (app.east) -- node[lbl, above, pos=0.5] {target bitrate} (tr.west);
     \draw[flow] (tr.south) -- node[lbl, right] {per-frame\\ split $(w_1,\dots,w_N)$} (spl.north);
     \draw[flow] (enc.east) -- node[lbl, above] {frame\\ bytes} (spl.west);
     \draw[flow] (spl.east) -- (p1.west);
@@ -151,15 +141,20 @@ replacing the \texttt{tikzpicture} below and keeping this caption unchanged.}
     \draw[flow] (p1.east) -- (rx.north west);
     \draw[flow] (p2.east) -- (rx.west);
     \draw[flow] (p3.east) -- (rx.south west);
-    % --- feedback ---
-    \draw[sig] (p1.north) |- node[lbl, pos=0.78, above]
-      {per-path state: cwnd, sRTT, buffer, throughput, loss} (tr.north east);
-    \draw[sig] (rx.south) -- (13.1,-1.4) -- node[lbl, pos=0.5, below]
-      {per-frame delivery reward} (8.45,-1.4) -- (8.45,2.72) -- (tr.south east);
-    \draw[sig] (13.1,-1.4) -- (13.1,-2.3) -- node[lbl, pos=0.55, below]
+    % --- feedback: per-path state, routed above the path column into the agent ---
+    \draw[sig] (p1.north) |- (tr.east);
+    \node[lbl, anchor=east] at (11.35,2.45)
+      {per-path state:\\ cwnd, sRTT, buffer,\\ throughput, loss};
+    % --- feedback: per-frame delivery reward, own lane above the path column ---
+    \coordinate (trtop) at ($(tr.north)!0.8!(tr.north east)$);
+    \coordinate (rlane) at (15.0,4.9);
+    \draw[sig] (rx.north) -- (rlane) -- node[lbl, pos=0.5, above]
+      {per-frame delivery reward} (trtop |- rlane) -- (trtop);
+    % --- feedback: application reward, own lane below everything ---
+    \draw[sig] (rx.south) -- (15.0,-2.4) -- node[lbl, pos=0.5, below]
       {application reward: VMAF, latency, jitter, loss over the window its bitrate governed}
-      (-2.7,-2.3) -- (-2.7,3.1) -- (app.west);
-  \end{tikzpicture}}
+      (-2.9,-2.4) -- (-2.9,3.4) -- (app.west);
+  \end{tikzpicture}
   \caption[The two-timescale design]{The two-timescale design. The application agent sets the encoder's target bitrate once per
   second; the transport agent divides each frame's bytes across the live paths once per frame, and it
   observes the target bitrate, which is what makes the pair hierarchical rather than two agents

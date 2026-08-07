@@ -577,17 +577,6 @@ the environment's pair, hour, and profile streams are held fixed, so every seed 
 of training contexts and only the learning process varies. And all five seeds are graded on the same
 10752~held-out decision contexts, loaded once and handed to every study of every seed.
 
-\gap{\cref{fig:p1eval:boxplots} is a fourth exception and is not listed here. Its box bodies and its
-fourth panel are drawn from the single reference run, as its own caption says, while the sentence above
-claims that ``\emph{every} quantitative result reported below'' is a five-seed mean and then names six
-floats, not seven. Either add it to the exception list in the next paragraph, or --- better --- adopt
-the five-seed rendering, which the pipeline already produces and which is staged in
-\texttt{figures-review/}. Adopting it changes three numbers in the surrounding text: the fourth panel's
-Low-Latency bar reads 4.51\% rather than 4.91\%, the Low-Loss bar reads 0.76\% rather than sitting on
-the 0.48\% floor, and the caveat sentences that exist only to undo the single-run rendering (``Shapes
-are drawn from the single reference run\ldots'' in the caption, and ``Low-Loss sits on that floor in
-the run the figure is drawn from but not in general'' in \cref{sec:p1eval:intent}) can be deleted
-rather than rewritten.}
 Three floats are the exception and are marked where they appear. \Cref{tab:p1eval:ablation} reports the
 single reference run, because it carries the full four-intent grid and its two discriminating columns
 are re-reported over seeds in \cref{tab:p1eval:seeds} immediately after. \Cref{tab:p1eval:heldout} and
@@ -941,12 +930,12 @@ loss is common, given that only 7.8\% of links are oversubscribed today. We retu
   \includegraphics[width=\linewidth]{p1eval_intent_boxplots.png}
   \caption[Chosen-path metrics under each intent]{Distributions of the chosen path's metrics as the conditioned policy is told each intent, over
   a fixed set of decision contexts. The Low-Latency intent lowers the chosen latency and the Throughput
-  intent raises the chosen goodput. Trust is scored with the canonical weights of \cref{eq:p1trust} and
+  intent raises the chosen path's capacity. Trust is scored with the canonical weights of \cref{eq:p1trust} and
   is therefore maximized by the Low-Latency intent, not the Low-Loss one; the fourth panel reports loss
-  exposure directly, since a boxplot of loss rate is a flat line at zero. Shapes are drawn from the
-  single reference run so that the four distributions stay legible; the text reports every quantity as a
-  mean over five training seeds, and the fourth panel is where the two differ most --- its 4.91\% is one
-  run's value for a quantity that ranges 2.2--8.6\% across seeds.}
+  exposure directly, since a boxplot of loss rate is a flat line at zero. Shapes pool the selections of
+  all five training seeds (53{,}760 decisions per box); the fourth panel gives the five-seed mean with a
+  95\% confidence interval, and is the one quantity here whose seed spread is wide --- its 4.51\% ranges
+  2.2--8.6\% across seeds.}
   \label{fig:p1eval:boxplots}
 \end{figure}
 
@@ -972,9 +961,9 @@ The fourth panel makes the point directly: the Low-Latency intent is the only on
 loss exposure, and it moves it \emph{up}. It is also the least stable quantity in the chapter, and we
 give it as a range rather than a point. Across seeds, Low-Latency selections incur loss in
 2.2--8.6\% of cases (mean 4.51\%), against a floor of 0.484\% that Throughput and Balanced sit on exactly
-in every seed. Low-Loss sits on that floor in the run the figure is drawn from but not in general: over
-five seeds it is 0.76\% [0.39, 1.12], so the floor is shared by two intents rather than by the three the
-figure appears to show. The direction of the Low-Latency effect holds in
+in every seed. Low-Loss does not sit on that floor: over
+five seeds it is 0.76\% [0.39, 1.12], so the floor belongs to two intents and not to three.
+The direction of the Low-Latency effect holds in
 every seed and its magnitude varies almost fourfold, which is worth knowing before treating any single
 number here as the effect size. Buying \SI{4.9}{\milli\second} of latency means accepting shorter, more
 heavily loaded paths. The mechanism works; it is the loss axis that has nothing to give.
@@ -1109,12 +1098,13 @@ reward are directly comparable, then under all four.
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=0.72\linewidth]{p1eval_probing.png}
-  \caption[Goodput against probing cost per selection]{Goodput against probing cost per selection under the Balanced intent (top-left is
+  \includegraphics[width=\linewidth]{p1eval_probing.png}
+  \caption[Residual capacity against probing cost per selection]{Residual bottleneck capacity against probing cost per selection under the Balanced intent (top-left is
   better), with 95\% confidence bars over five training seeds; the heuristics are deterministic and
-  identical in every seed, so their bars vanish. The axis is labelled ``achieved goodput'' but measures
-  residual bottleneck capacity on the chosen path (\cref{sec:p1design:env}), not a delivered rate. The learned selector reaches within 0.74\% of the
-  goodput of exhaustive widest-path selection at roughly \(40\times\) less probing, because it inspects
+  identical in every seed, so their bars vanish. Five of the seven methods probe all 30~candidates and
+  therefore sit at exactly the same cost, so the horizontal axis is logarithmic and each marker carries
+  its own value. The learned selector reaches within 0.74\% of the
+  capacity found by exhaustive widest-path selection at roughly \(40\times\) less probing, because it inspects
   the one path it selects rather than all~30. It is also the cheapest method on the plot: every
   load-blind heuristic must measure all 30~candidates to apply its rule, and so probes about
   \(2.6\times\) more than the learned selector while choosing worse.}
@@ -1272,10 +1262,10 @@ hours in which the aggregate demand offered to a flow's candidate paths exceeds 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\linewidth]{p1eval_ceiling.png}
-  \caption[Goodput and reward against realized congestion]{Goodput (left) and intent-weighted reward (right) against realized congestion,
+  \caption[Residual capacity and reward against realized congestion]{Residual bottleneck capacity (left) and intent-weighted reward (right) against realized congestion,
   1792~decisions per bin per method, mean over five training seeds with 95\% confidence bands (narrower
-  than the line width for every method). As throughout the chapter, the left axis is residual bottleneck
-  capacity on the chosen path (\cref{sec:p1design:env}) and not a rate a flow delivered --- the
+  than the line width for every method). The left panel is capacity on the chosen path
+  (\cref{sec:p1design:env}) and not a rate a flow delivered --- the
   distinction the paragraph after this figure returns to. The learned selector tracks the widest-path ceiling at every
   load, but that ceiling itself falls by about 25\% from light to heavy congestion: past a point, no
   single path can carry the demand. The right panel is the bridging argument of this thesis in one picture --
